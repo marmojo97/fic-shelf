@@ -7,7 +7,7 @@ import ImportModal from './ImportModal.jsx';
 import { getChangelogUnread } from '../api/index.js';
 
 const NAV_ITEMS = [
-  { to: '/shelf', icon: BookOpen, label: 'My Shelf' },
+  { to: '/shelf', icon: BookOpen, label: 'My Shelves' },
   { to: '/discover', icon: Compass, label: 'Discover' },
   { to: '/stats', icon: BarChart2, label: 'Stats' },
   { to: '/reclists', icon: List, label: 'Rec Lists' },

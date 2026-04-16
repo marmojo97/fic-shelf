@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, ExternalLink, Heart, BookOpen, Calendar, RotateCcw, Bookmark, Trash2, Zap, Edit3, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, ExternalLink, Heart, RotateCcw, Trash2, Zap, Edit3, Save, Calendar } from 'lucide-react';
 import StarRating from './StarRating.jsx';
 import { StatusBadge, ContentRatingBadge, ShelfBadge } from './Badge.jsx';
 import { updateFic, deleteFic } from '../api/index.js';
@@ -10,18 +10,20 @@ const SHELVES = [
   { value: 'read',         label: 'Read' },
   { value: 'dnf',          label: 'Did Not Finish' },
   { value: 're-reading',   label: 'Re-reading' },
+  { value: 'history',      label: 'History' },
 ];
 
 function formatWordCount(n) {
-  if (!n) return '—';
+  if (\!n) return '—';
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M words`;
   if (n >= 1000) return `${Math.round(n / 1000)}k words`;
   return `${n} words`;
 }
 
 function formatDate(d) {
-  if (!d) return null;
-  try { return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); } catch { return d; }
+  if (\!d) return null;
+  try { return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+  catch { return d; }
 }
 
 function MetaRow({ label, children }) {
@@ -34,16 +36,27 @@ function MetaRow({ label, children }) {
 }
 
 export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
+  const [notes, setNotes]               = useState(fic.personalNotes || '');
   const [editingNotes, setEditingNotes] = useState(false);
-  const [notes, setNotes] = useState(fic.personalNotes || '');
-  const [rating, setRating] = useState(fic.personalRating || 0);
-  const [shelf, setShelf] = useState(fic.shelf);
+  const [rating, setRating]             = useState(fic.personalRating || 0);
+  const [shelf, setShelf]               = useState(fic.shelf);
   const [chaptersRead, setChaptersRead] = useState(fic.chaptersRead || 0);
-  const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [emotionalDamage, setEmotionalDamage] = useState(fic.emotionalDamage);
+  const [dateFinished, setDateFinished] = useState(fic.dateFinished || '');
+  const [showDatePrompt, setShowDatePrompt] = useState(false);
+  const [saving, setSaving]             = useState(false);
+  const [saved, setSaved]               = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const readingSpeed = 250; // wpm default
+  // Track whether there are unsaved changes
+  const isDirty =
+    rating     \!== (fic.personalRating || 0) ||
+    shelf      \!== fic.shelf ||
+    chaptersRead \!== (fic.chaptersRead || 0) ||
+    emotionalDamage \!== fic.emotionalDamage ||
+    dateFinished \!== (fic.dateFinished || '');
+
+  const readingSpeed = 250;
   const estimatedMinutes = fic.wordCount ? Math.round(fic.wordCount / readingSpeed) : 0;
   const estimatedHours = Math.floor(estimatedMinutes / 60);
   const remainingMinutes = estimatedMinutes % 60;
@@ -57,9 +70,12 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
         shelf,
         chaptersRead: Number(chaptersRead),
         emotionalDamage,
+        dateFinished: dateFinished || null,
       });
       onUpdate(data.fic);
       setEditingNotes(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       console.error(e);
     } finally {
@@ -67,38 +83,32 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
     }
   }
 
-  async function handleDelete() {
+  async function handleSaveNotes() {
+    setSaving(true);
     try {
-      await deleteFic(fic.id);
-      onDelete(fic.id);
-    } catch (e) {
-      console.error(e);
+      const { data } = await updateFic(fic.id, { personalNotes: notes });
+      onUpdate(data.fic);
+      setEditingNotes(false);
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete() {
+    try { await deleteFic(fic.id); onDelete(fic.id); }
+    catch (e) { console.error(e); }
+  }
+
+  function handleShelfClick(newShelf) {
+    setShelf(newShelf);
+    // If marking as read and no date set yet, prompt for date
+    if (newShelf === 'read' && \!dateFinished) {
+      setShowDatePrompt(true);
     }
   }
 
-  async function handleRatingChange(newRating) {
-    setRating(newRating);
-    try {
-      const { data } = await updateFic(fic.id, { personalRating: newRating });
-      onUpdate(data.fic);
-    } catch {}
-  }
-
-  async function handleShelfChange(newShelf) {
-    setShelf(newShelf);
-    try {
-      const { data } = await updateFic(fic.id, { shelf: newShelf });
-      onUpdate(data.fic);
-    } catch {}
-  }
-
   async function handleEmotionalDamageToggle() {
-    const newVal = !emotionalDamage;
+    const newVal = \!emotionalDamage;
     setEmotionalDamage(newVal);
-    try {
-      const { data } = await updateFic(fic.id, { emotionalDamage: newVal });
-      onUpdate(data.fic);
-    } catch {}
   }
 
   const progress = fic.chapterCount > 1 && fic.chaptersRead > 0
@@ -107,42 +117,38 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 z-40 modal-overlay"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/40 z-40 modal-overlay" onClick={onClose} />
 
-      {/* Drawer panel */}
-      <div className="fixed top-0 right-0 bottom-0 w-full max-w-lg bg-surface border-l border-border-subtle z-50 flex flex-col drawer-panel overflow-hidden">
-        {/* Header */}
+      <div className="fixed top-0 right-0 bottom-0 w-full max-w-lg bg-surface border-l border-border z-50 flex flex-col drawer-panel overflow-hidden shadow-2xl">
+        {/* Header band */}
         <div
-          className="h-28 flex-shrink-0 relative"
-          style={{ backgroundColor: fic.coverColor || '#0d4f4f' }}
+          className="h-24 flex-shrink-0 relative"
+          style={{ backgroundColor: fic.coverColor || '#990000' }}
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/40" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/30" />
           <div className="absolute top-3 right-3">
-            <button onClick={onClose} className="p-1.5 bg-black/30 hover:bg-black/50 rounded-lg transition-colors">
+            <button onClick={onClose} className="p-1.5 bg-black/25 hover:bg-black/45 rounded-lg transition-colors">
               <X className="w-4 h-4 text-white" />
             </button>
           </div>
           <div className="absolute bottom-3 left-4 right-12">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-0.5">
               <ContentRatingBadge rating={fic.contentRating} />
               <StatusBadge status={fic.completionStatus} compact />
               {emotionalDamage && (
-                <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-medium">
+                <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-200 font-medium">
                   <Zap className="w-3 h-3" fill="currentColor" /> Emotional Damage
                 </span>
               )}
             </div>
-            <p className="text-white/60 text-xs">{fic.fandom}</p>
+            <p className="text-white/70 text-xs truncate">{fic.fandom}</p>
           </div>
         </div>
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           <div className="px-5 py-4 space-y-5">
+
             {/* Title + author */}
             <div>
               <h2 className="text-txt-primary font-bold text-lg leading-snug">{fic.title}</h2>
@@ -161,7 +167,7 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
                 {fic.ships?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {fic.ships.map((ship, i) => (
-                      <span key={i} className="chip bg-pink-500/10 text-pink-300">
+                      <span key={i} className="chip bg-pink-50 text-pink-700 border border-pink-200">
                         <Heart className="w-2.5 h-2.5" /> {ship}
                       </span>
                     ))}
@@ -170,7 +176,7 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
                 {fic.characters?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {fic.characters.map((char, i) => (
-                      <span key={i} className="chip bg-elevated text-txt-secondary">{char}</span>
+                      <span key={i} className="chip bg-elevated text-txt-secondary border border-border-subtle">{char}</span>
                     ))}
                   </div>
                 )}
@@ -178,34 +184,28 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
             )}
 
             {/* Metadata */}
-            <div className="space-y-2.5 bg-elevated rounded-xl p-4">
+            <div className="space-y-2.5 bg-elevated rounded-xl p-4 border border-border-subtle">
               <MetaRow label="Words">
                 <span className="font-medium">{formatWordCount(fic.wordCount)}</span>
-              </MetaRow>
-              <MetaRow label="Chapters">
-                <span>{fic.chapterCount || '?'} chapters</span>
-                {fic.chapterCount > 0 && estimatedHours > 0 && (
+                {estimatedHours > 0 && (
                   <span className="text-txt-muted text-xs ml-2">
                     ~{estimatedHours}h {remainingMinutes > 0 ? `${remainingMinutes}m` : ''} to read
                   </span>
                 )}
               </MetaRow>
+              <MetaRow label="Chapters"><span>{fic.chapterCount || '?'} chapters</span></MetaRow>
               {fic.seriesName && <MetaRow label="Series"><span>{fic.seriesName}</span></MetaRow>}
-              {fic.language && fic.language !== 'English' && (
+              {fic.language && fic.language \!== 'English' && (
                 <MetaRow label="Language"><span>{fic.language}</span></MetaRow>
               )}
               {fic.lastUpdatedDate && (
                 <MetaRow label="Updated"><span>{formatDate(fic.lastUpdatedDate)}</span></MetaRow>
               )}
               {fic.dateStarted && (
-                <MetaRow label="Started">
-                  <span>{formatDate(fic.dateStarted)}</span>
-                </MetaRow>
+                <MetaRow label="Started"><span>{formatDate(fic.dateStarted)}</span></MetaRow>
               )}
-              {fic.dateFinished && (
-                <MetaRow label="Finished">
-                  <span>{formatDate(fic.dateFinished)}</span>
-                </MetaRow>
+              {(dateFinished || fic.dateFinished) && (
+                <MetaRow label="Finished"><span>{formatDate(dateFinished || fic.dateFinished)}</span></MetaRow>
               )}
               {fic.rereadCount > 0 && (
                 <MetaRow label="Re-reads">
@@ -224,7 +224,7 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
                   <span className="text-txt-muted text-xs">{chaptersRead} / {fic.chapterCount} chapters</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-elevated rounded-full overflow-hidden">
+                  <div className="flex-1 h-2 bg-elevated rounded-full overflow-hidden border border-border-subtle">
                     <div
                       className="h-full bg-accent rounded-full transition-all"
                       style={{ width: `${Math.min(100, (chaptersRead / fic.chapterCount) * 100)}%` }}
@@ -236,20 +236,19 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
                     max={fic.chapterCount}
                     value={chaptersRead}
                     onChange={(e) => setChaptersRead(Math.min(fic.chapterCount, Math.max(0, Number(e.target.value))))}
-                    onBlur={handleSave}
                     className="w-16 input-field text-center text-sm py-1"
                   />
                 </div>
               </div>
             )}
 
-            {/* Warnings + tags */}
+            {/* Tags */}
             {fic.contentWarnings?.length > 0 && (
               <div>
                 <p className="text-txt-muted text-xs mb-1.5 uppercase tracking-wider font-semibold">Content Warnings</p>
                 <div className="flex flex-wrap gap-1.5">
                   {fic.contentWarnings.map((w, i) => (
-                    <span key={i} className="chip bg-red-500/10 text-red-400">{w}</span>
+                    <span key={i} className="chip bg-red-50 text-red-700 border border-red-200">{w}</span>
                   ))}
                 </div>
               </div>
@@ -259,30 +258,35 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
                 <p className="text-txt-muted text-xs mb-1.5 uppercase tracking-wider font-semibold">Tags</p>
                 <div className="flex flex-wrap gap-1.5">
                   {fic.tags.map((t, i) => (
-                    <span key={i} className="chip bg-elevated text-txt-secondary">{t}</span>
+                    <span key={i} className="chip bg-elevated text-txt-secondary border border-border-subtle">{t}</span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Personal rating */}
+            {/* Your Rating */}
             <div>
               <p className="text-txt-muted text-xs mb-2 uppercase tracking-wider font-semibold">Your Rating</p>
-              <StarRating value={rating} onChange={handleRatingChange} size={22} />
+              <StarRating value={rating} onChange={setRating} size={24} />
+              {rating > 0 && (
+                <p className="text-txt-muted text-xs mt-1">
+                  {['', 'Didn\'t enjoy it', 'It was okay', 'Liked it', 'Really liked it', 'Absolutely loved it'][rating]}
+                </p>
+              )}
             </div>
 
-            {/* Shelf selector */}
+            {/* Shelf */}
             <div>
               <p className="text-txt-muted text-xs mb-2 uppercase tracking-wider font-semibold">Shelf</p>
               <div className="flex flex-wrap gap-1.5">
                 {SHELVES.map((s) => (
                   <button
                     key={s.value}
-                    onClick={() => handleShelfChange(s.value)}
+                    onClick={() => handleShelfClick(s.value)}
                     className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                       shelf === s.value
-                        ? 'bg-accent/20 border-accent text-accent'
-                        : 'border-border text-txt-muted hover:border-border hover:text-txt-secondary'
+                        ? 'bg-accent text-white border-accent'
+                        : 'border-border text-txt-muted hover:border-accent hover:text-accent'
                     }`}
                   >
                     {s.label}
@@ -291,12 +295,43 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
               </div>
             </div>
 
-            {/* Personal notes */}
+            {/* Date completed prompt (shown when Read is selected) */}
+            {showDatePrompt && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-green-700" />
+                  <p className="text-green-800 text-sm font-medium">When did you finish this?</p>
+                </div>
+                <input
+                  type="date"
+                  className="input-field text-sm"
+                  value={dateFinished}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setDateFinished(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowDatePrompt(false)}
+                    className="btn-primary text-xs py-1.5 px-3"
+                  >
+                    Set date
+                  </button>
+                  <button
+                    onClick={() => { setDateFinished(''); setShowDatePrompt(false); }}
+                    className="text-xs text-txt-muted hover:text-txt-secondary px-2"
+                  >
+                    Skip
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-txt-muted text-xs uppercase tracking-wider font-semibold">Notes</p>
                 <button
-                  onClick={() => setEditingNotes(!editingNotes)}
+                  onClick={() => setEditingNotes(\!editingNotes)}
                   className="text-xs text-accent hover:text-accent-dim flex items-center gap-1"
                 >
                   <Edit3 className="w-3 h-3" /> {editingNotes ? 'Cancel' : 'Edit'}
@@ -310,25 +345,26 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Your private thoughts, feelings, and reactions..."
                   />
-                  <button onClick={handleSave} disabled={saving} className="btn-primary text-sm mt-2">
+                  <button onClick={handleSaveNotes} disabled={saving} className="btn-primary text-sm mt-2">
+                    <Save className="w-3.5 h-3.5" />
                     {saving ? 'Saving...' : 'Save Notes'}
                   </button>
                 </div>
               ) : (
                 <p className={`text-sm leading-relaxed ${notes ? 'text-txt-secondary' : 'text-txt-muted italic'}`}>
-                  {notes || 'No notes yet. Add your thoughts!'}
+                  {notes || 'No notes yet. Add your thoughts\!'}
                 </p>
               )}
             </div>
 
-            {/* Action buttons */}
+            {/* Bottom actions */}
             <div className="flex items-center gap-2 pt-2 border-t border-border-subtle">
               <button
                 onClick={handleEmotionalDamageToggle}
                 className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-colors ${
                   emotionalDamage
-                    ? 'bg-pink-500/20 border-pink-500/40 text-pink-300'
-                    : 'border-border text-txt-muted hover:text-pink-300 hover:border-pink-500/30'
+                    ? 'bg-pink-50 border-pink-300 text-pink-700'
+                    : 'border-border text-txt-muted hover:text-pink-600 hover:border-pink-300'
                 }`}
               >
                 <Zap className="w-3.5 h-3.5" fill={emotionalDamage ? 'currentColor' : 'none'} />
@@ -340,26 +376,41 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
               {confirmDelete ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-txt-muted">Sure?</span>
-                  <button onClick={handleDelete} className="text-xs px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">
+                  <button onClick={handleDelete} className="text-xs px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
                     Delete
                   </button>
-                  <button onClick={() => setConfirmDelete(false)} className="text-xs px-3 py-2 bg-elevated text-txt-muted rounded-lg hover:text-txt-secondary">
+                  <button onClick={() => setConfirmDelete(false)} className="text-xs px-3 py-2 bg-elevated text-txt-muted rounded-lg hover:text-txt-secondary border border-border">
                     Cancel
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={() => setConfirmDelete(true)}
-                  className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border text-txt-muted hover:text-red-400 hover:border-red-500/30 transition-colors"
+                  className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border text-txt-muted hover:text-red-600 hover:border-red-300 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Remove
                 </button>
               )}
             </div>
 
-            <div className="h-4" />
+            <div className="h-20" />
           </div>
         </div>
+
+        {/* Sticky save bar — shown whenever there are unsaved changes */}
+        {isDirty && (
+          <div className="flex-shrink-0 px-5 py-3 border-t border-border bg-surface shadow-lg flex items-center justify-between gap-3">
+            <p className="text-txt-muted text-xs">You have unsaved changes</p>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-primary text-sm"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save changes'}
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

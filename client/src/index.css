@@ -3,121 +3,72 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    box-sizing: border-box;
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
 
   body {
-    background-color: #0d1117;
-    color: #f1f5f9;
+    background-color: #F5F3EE;
+    color: #1A1A1A;
     font-family: 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: #161c27;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: #3a4558;
-    border-radius: 3px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: #4a5568;
-  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #F0EEE4; }
+  ::-webkit-scrollbar-thumb { background: #C8C3BB; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #A89F95; }
 }
 
 @layer components {
   .btn-primary {
     @apply bg-accent hover:bg-accent-dim text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
-
+  .btn-secondary {
+    @apply bg-elevated hover:bg-border-subtle text-txt-secondary hover:text-txt-primary font-medium px-4 py-2 rounded-lg border border-border transition-colors duration-150 flex items-center gap-2;
+  }
   .btn-ghost {
     @apply hover:bg-elevated text-txt-secondary hover:text-txt-primary font-medium px-4 py-2 rounded-lg transition-colors duration-150 flex items-center gap-2;
   }
-
   .btn-danger {
-    @apply bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium px-4 py-2 rounded-lg transition-colors duration-150 flex items-center gap-2;
+    @apply bg-red-50 hover:bg-red-100 text-red-700 font-medium px-4 py-2 rounded-lg transition-colors duration-150 flex items-center gap-2;
   }
-
   .input-field {
-    @apply w-full bg-elevated border border-border rounded-lg px-3 py-2 text-txt-primary placeholder-txt-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors duration-150;
+    @apply w-full bg-white border border-border rounded-lg px-3 py-2 text-txt-primary placeholder-txt-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors duration-150;
   }
-
   .card {
-    @apply bg-card border border-border-subtle rounded-xl;
+    @apply bg-card border border-border-subtle rounded-xl shadow-sm;
   }
-
   .section-header {
     @apply text-txt-muted uppercase tracking-wider text-xs font-semibold px-3 py-1;
   }
-
   .chip {
     @apply inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full;
   }
 }
 
-/* Modal overlay */
-.modal-overlay {
-  animation: fadeIn 0.15s ease-out;
-}
+/* Animations */
+.modal-overlay  { animation: fadeIn 0.15s ease-out; }
+.modal-content  { animation: slideUp 0.2s ease-out; }
+.drawer-panel   { animation: slideInRight 0.25s ease-out; }
 
-.modal-content {
-  animation: slideUp 0.2s ease-out;
-}
+@keyframes fadeIn       { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp      { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
-/* Drawer */
-.drawer-panel {
-  animation: slideInRight 0.25s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { transform: translateY(16px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
-
-/* Custom range input */
+/* Range input */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   height: 4px;
   border-radius: 2px;
-  background: #3a4558;
+  background: #C8C3BB;
   outline: none;
 }
-
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 16px; height: 16px;
   border-radius: 50%;
-  background: #14b8a6;
+  background: #990000;
   cursor: pointer;
-}
-
-/* Transition utilities */
-.transition-all-smooth {
-  transition: all 0.2s ease;
 }
