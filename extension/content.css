@@ -1,0 +1,41 @@
+/* Archivd extension button styles */
+
+#archivd-save-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.archivd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  background: #14b8a6;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(20, 184, 166, 0.45), 0 2px 8px rgba(0,0,0,0.2);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+.archivd-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(20, 184, 166, 0.55), 0 3px 12px rgba(0,0,0,0.25);
+}
+
+.archivd-btn:active {
+  transform: translateY(0);
+}
+
+.archivd-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+  transform: none;
+}

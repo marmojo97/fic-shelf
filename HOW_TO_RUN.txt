@@ -1,0 +1,95 @@
+════════════════════════════════════════════════
+  ARCHIVD — Your Fanfic Shelf
+  Full-stack app: React + Express + SQLite
+════════════════════════════════════════════════
+
+REQUIREMENTS
+  • Node.js 18+ (https://nodejs.org)
+  • npm (comes with Node)
+
+────────────────────────────────────────────────
+ONE-TIME SETUP
+────────────────────────────────────────────────
+
+Open a terminal, navigate to this folder, then run:
+
+  cd archivd
+  npm install
+  cd server && npm install && cd ..
+  cd client && npm install && cd ..
+  cd server && node seed.js && cd ..
+
+  (Or on Mac/Linux: bash setup.sh)
+
+────────────────────────────────────────────────
+START THE APP
+────────────────────────────────────────────────
+
+From the archivd/ folder:
+
+  npm run dev
+
+This starts both servers:
+  • API:      http://localhost:3001
+  • App:      http://localhost:5173  ← open this
+
+────────────────────────────────────────────────
+DEMO ACCOUNT (pre-loaded with 15 fics!)
+────────────────────────────────────────────────
+
+  Email:    demo@archivd.app
+  Password: archivd
+
+Or create your own account with any email.
+
+────────────────────────────────────────────────
+WHAT'S INCLUDED
+────────────────────────────────────────────────
+
+My Shelf       — Grid + list view, shelf tabs (Reading /
+                 Want to Read / Read / DNF / Re-reading),
+                 search, sort, fic drawer with full metadata
+
+Add Fic        — Paste an AO3 URL for simulated auto-fill,
+                 or manual entry. Tags, ships, warnings, all of it.
+
+Stats          — Monthly reading chart, fandom breakdown,
+                 tag cloud, ships, rating distribution,
+                 annual challenge progress bar
+
+Discover       — Browse your shelf by fandom, find top-rated
+                 and emotionally damaging fics
+
+Rec Lists      — Curate and share themed fic lists
+
+Profile        — Edit display name/bio, set reading speed
+                 (used for estimated read times) and annual goal
+
+Export         — CSV or JSON export from the shelf toolbar
+
+────────────────────────────────────────────────
+PROJECT STRUCTURE
+────────────────────────────────────────────────
+
+archivd/
+├── server/          Express API + SQLite DB
+│   ├── index.js     Entry point (port 3001)
+│   ├── db.js        SQLite schema + connection
+│   ├── seed.js      Demo data (run once)
+│   ├── middleware/
+│   │   └── auth.js  JWT verification
+│   └── routes/
+│       ├── auth.js      Register / login / profile
+│       ├── fics.js      CRUD + export + bookmarks
+│       ├── stats.js     Reading stats aggregation
+│       ├── shelves.js   Custom shelf management
+│       ├── reclists.js  Rec list CRUD
+│       └── ao3.js       Simulated AO3 metadata fetch
+└── client/          React + Vite + Tailwind
+    └── src/
+        ├── pages/   MyShelf, Stats, Discover, RecLists, Profile
+        ├── components/  FicCard, FicDrawer, AddFicModal, etc.
+        ├── contexts/    AuthContext
+        └── api/         Axios API wrapper
+
+════════════════════════════════════════════════
