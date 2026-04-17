@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: '/api' });
+// In development, Vite proxies /api → localhost:3001.
+// In production, set VITE_API_URL to your Railway backend URL (e.g. https://archivd-production.up.railway.app)
+const BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+const api = axios.create({ baseURL: BASE });
 
 // Attach JWT automatically
 api.interceptors.request.use((config) => {
@@ -67,6 +70,7 @@ export const confirmAo3Csv = (file, shelf) => {
   fd.append('shelf', shelf);
   return api.post('/import/ao3-csv/confirm', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
 };
+export const bulkSortFics = (assignments) => api.post('/import/bulk-sort', { assignments });
 export const markOnboardingDone = () => api.post('/auth/onboarding-done');
 export const getInviteRequired = () => api.get('/auth/invite-required');
 

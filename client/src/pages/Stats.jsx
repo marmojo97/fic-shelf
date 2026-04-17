@@ -32,7 +32,7 @@ function StatCard({ icon: Icon, label, value, sub, accent = false }) {
 }
 
 const CustomTooltip = ({ active, payload, label }) => {
-  if (\!active || \!payload?.length) return null;
+  if (!active || !payload?.length) return null;
   return (
     <div className="bg-surface border border-border rounded-lg px-3 py-2 shadow-xl">
       <p className="text-txt-muted text-xs mb-1">{label}</p>
@@ -46,7 +46,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 function formatWords(n) {
-  if (\!n) return '0';
+  if (!n) return '0';
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
   if (n >= 1000) return `${Math.round(n / 1000)}k`;
   return String(n);
@@ -55,13 +55,21 @@ function formatWords(n) {
 export default function Stats() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [statsError, setStatsError] = useState(null);
   const [year, setYear] = useState(new Date().getFullYear());
   const [wordView, setWordView] = useState('monthly'); // 'monthly' | 'yearly' | 'daily'
   const { user } = useAuth();
 
   useEffect(() => {
     setLoading(true);
-    getStats(year).then(r => { setData(r.data); setLoading(false); }).catch(() => setLoading(false));
+    setStatsError(null);
+    getStats(year)
+      .then(r => { setData(r.data); setLoading(false); })
+      .catch(err => {
+        console.error('[Stats] Failed to load:', err?.response?.data || err.message);
+        setStatsError(err?.response?.data?.detail || err.message || 'Unknown error');
+        setLoading(false);
+      });
   }, [year]);
 
   if (loading) {
@@ -71,7 +79,16 @@ export default function Stats() {
       </div>
     );
   }
-  if (\!data) return <div className="p-6 text-txt-muted">Could not load stats.</div>;
+  if (!data) return (
+    <div className="p-6">
+      <p className="text-txt-muted">Could not load stats.</p>
+      {statsError && (
+        <p className="text-red-500 text-xs mt-2 font-mono bg-red-50 px-3 py-2 rounded-lg border border-red-200 max-w-lg">
+          {statsError}
+        </p>
+      )}
+    </div>
+  );
 
   const {
     totals, yearStats, annualGoal, monthlyData, byFandom, byRating, byCompletion,
@@ -155,7 +172,7 @@ export default function Stats() {
         <StatCard icon={BookOpen}   label="Total Read"   value={totals.total_read?.toLocaleString() || '0'} sub="all time" />
         <StatCard icon={TrendingUp} label="Words Read"   value={formatWords(totalWordsRead)}                sub="in finished fics" />
         <StatCard icon={Star}       label="Avg Rating"   value={totals.avg_rating ? Number(totals.avg_rating).toFixed(1) : '—'} sub="out of 5" />
-        <StatCard icon={Flame}      label="Streak"       value={`${streak} day${streak \!== 1 ? 's' : ''}`} sub="current streak" accent />
+        <StatCard icon={Flame}      label="Streak"       value={`${streak} day${streak !== 1 ? 's' : ''}`} sub="current streak" accent />
       </div>
 
       {/* Words read + book equivalent hero cards */}
@@ -231,7 +248,7 @@ export default function Stats() {
                 <div key={i} className="bg-elevated rounded-lg px-2 py-2 text-center">
                   <p className="text-txt-muted text-xs">{m.month}</p>
                   <p className="text-txt-primary font-semibold text-xs mt-0.5">{formatWords(m.words)}</p>
-                  <p className="text-txt-muted text-[10px]">{m.fics} fic{m.fics \!== 1 ? 's' : ''}</p>
+                  <p className="text-txt-muted text-[10px]">{m.fics} fic{m.fics !== 1 ? 's' : ''}</p>
                 </div>
               ))}
             </div>
@@ -326,13 +343,13 @@ export default function Stats() {
 
       {/* V2 row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {completionRate \!== null && (
+        {completionRate !== null && (
           <StatCard icon={CheckCircle2} label="Completion Rate" value={`${completionRate}%`} sub="of started fics" />
         )}
         {avgWordCount > 0 && (
           <StatCard icon={BarChart2} label="Avg Word Count" value={formatWords(avgWordCount)} sub="per finished fic" />
         )}
-        {readingPaceWpd \!== null && (
+        {readingPaceWpd !== null && (
           <StatCard icon={Gauge} label="Reading Pace" value={`${formatWords(readingPaceWpd)}/day`} sub="words on avg" />
         )}
         {longestFic && (
@@ -369,7 +386,7 @@ export default function Stats() {
         <div className="flex items-center justify-between">
           <span className="text-txt-muted text-xs">{goalProgress}% complete</span>
           {goalProgress >= 100
-            ? <span className="text-accent text-xs font-medium">🎉 Challenge complete\!</span>
+            ? <span className="text-accent text-xs font-medium">🎉 Challenge complete!</span>
             : <span className="text-txt-muted text-xs">{annualGoal - yearStats.fics_this_year} to go</span>}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-4">
