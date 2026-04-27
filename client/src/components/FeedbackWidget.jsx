@@ -72,7 +72,7 @@ export default function FeedbackWidget() {
   }
 
   return (
-    <div id="feedback-widget-root" className="fixed bottom-6 right-6 z-50">
+    <div id="feedback-widget-root" className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
       {/* Floating button */}
       {!open && (
         <button

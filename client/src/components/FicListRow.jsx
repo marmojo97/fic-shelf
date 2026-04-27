@@ -4,7 +4,7 @@ import StarRating from './StarRating.jsx';
 import { StatusBadge, ContentRatingBadge } from './Badge.jsx';
 
 function formatWordCount(n) {
-  if (\!n) return '—';
+  if (!n) return '—';
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
   if (n >= 1000) return `${Math.round(n / 1000)}k`;
   return `${n}`;
@@ -36,7 +36,7 @@ export default function FicListRow({ fic, onClick, selectable, selected, onSelec
       )}
 
       {/* Color dot (hidden when selectable) */}
-      {\!selectable && (
+      {!selectable && (
         <div
           className="w-2.5 h-2.5 rounded-full flex-shrink-0"
           style={{ backgroundColor: fic.coverColor || '#990000' }}
@@ -61,7 +61,7 @@ export default function FicListRow({ fic, onClick, selectable, selected, onSelec
       <div className="hidden lg:flex items-center gap-1 w-40 flex-shrink-0">
         {primaryShip ? (
           <>
-            <Heart className="w-3 h-3 text-pink-500/70 flex-shrink-0" />
+            <Heart className="w-3 h-3 text-pink-400 flex-shrink-0" fill="currentColor" />
             <span className="text-txt-secondary text-xs truncate">{primaryShip}</span>
           </>
         ) : (

@@ -25,6 +25,8 @@ export const createFic = (data) => api.post('/fics', data);
 export const updateFic = (id, data) => api.put(`/fics/${id}`, data);
 export const deleteFic = (id) => api.delete(`/fics/${id}`);
 export const bulkMoveFics = (ficIds, shelf) => api.post('/fics/bulk-move', { ficIds, shelf });
+export const bulkDeleteFics = (ficIds) => api.post('/fics/bulk-delete', { ficIds });
+export const bulkRateFics = (ficIds, rating, overwrite = false) => api.post('/fics/bulk-rate', { ficIds, rating, overwrite });
 export const exportCsv = () => api.get('/fics/export/csv', { responseType: 'blob' });
 export const exportJson = () => api.get('/fics/export/json', { responseType: 'blob' });
 

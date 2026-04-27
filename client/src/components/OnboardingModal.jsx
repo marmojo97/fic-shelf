@@ -13,12 +13,20 @@ const STEPS = [
   {
     icon: Upload,
     title: 'Import your AO3 history',
-    description: 'If you already have a reading history on AO3, you can import it in seconds using their CSV export. Archivd will recognise your ratings, completion status, and more.',
+    description: 'Import your AO3 reading history using the Tampermonkey userscript method — it takes about 5 minutes to set up and works directly from your browser.',
+    steps: [
+      'Install the Tampermonkey extension from tampermonkey.net',
+      'In Chrome: go to chrome://extensions → enable Developer Mode',
+      'In Tampermonkey: go to Settings → enable "Allow access to file URLs" and set Config Mode to "Advanced"',
+      'Create a new script in Tampermonkey and paste in the AO3 History export script',
+      'Go to your AO3 History page — a "Download History" button will appear',
+      'Click it to download your history as a CSV, then import it here',
+    ],
     action: {
-      label: 'How to export from AO3',
-      href: 'https://archiveofourown.org/users/download',
+      label: 'Get the AO3 History export script',
+      href: 'https://greasyfork.org/en/scripts/423714-ao3-reading-history-exporter',
     },
-    hint: 'Go to AO3 → My Bookmarks or Works → Export → Download as CSV, then use the Import CSV button in the sidebar.',
+    hint: 'You can always import later — use the Import CSV button in the sidebar at any time.',
   },
   {
     icon: Puzzle,
@@ -71,6 +79,16 @@ export default function OnboardingModal({ onDone }) {
           <div className="space-y-2">
             <h2 className="text-txt-primary text-xl font-bold">{current.title}</h2>
             <p className="text-txt-secondary text-sm leading-relaxed">{current.description}</p>
+            {current.steps && (
+              <ol className="mt-2 space-y-1.5">
+                {current.steps.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-txt-secondary">
+                    <span className="flex-shrink-0 w-4 h-4 rounded-full bg-accent/20 text-accent text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
             {current.hint && (
               <p className="text-txt-muted text-xs leading-relaxed bg-elevated rounded-lg px-3 py-2 mt-2">
                 {current.hint}

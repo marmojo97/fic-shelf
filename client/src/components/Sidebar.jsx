@@ -45,10 +45,10 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
+          <div className="w-[30px] h-[30px] bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
             <Bookmark className="w-4 h-4 text-white" fill="currentColor" />
           </div>
-          <span className="text-txt-primary font-semibold text-lg tracking-tight">Archivd</span>
+          <span className="text-txt-primary font-bold text-[17px] tracking-tight">Archivd</span>
         </div>
       </div>
 

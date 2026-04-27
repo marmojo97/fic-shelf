@@ -37,8 +37,8 @@ export default {
         },
       },
       fontFamily: {
-        sans:  ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        serif: ['Georgia', 'ui-serif', 'serif'],
+        sans:  ['Roboto', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['Roboto', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       animation: {
         'slide-in-right': 'slideInRight 0.25s ease-out',

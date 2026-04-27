@@ -1,7 +1,7 @@
 import React from 'react';
 import { Heart, BookOpen, Zap } from 'lucide-react';
 import StarRating from './StarRating.jsx';
-import { StatusBadge, ContentRatingBadge } from './Badge.jsx';
+import { ContentRatingBadge } from './Badge.jsx';
 
 function formatWordCount(n) {
   if (!n) return '—';
@@ -16,74 +16,77 @@ export default function FicCard({ fic, onClick }) {
 
   return (
     <article
-      className="card group cursor-pointer hover:border-border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30 overflow-hidden flex flex-col"
+      className="bg-white border border-border-subtle rounded-xl overflow-hidden flex flex-col cursor-pointer
+                 shadow-[0_1px_2px_rgba(0,0,0,0.04)]
+                 hover:border-border hover:-translate-y-0.5
+                 hover:shadow-[0_18px_36px_rgba(0,0,0,0.18)]
+                 transition-all duration-200"
       onClick={() => onClick(fic)}
     >
-      {/* Fandom color banner */}
+      {/* Fandom color banner — 80px */}
       <div
-        className="h-12 w-full flex-shrink-0 relative overflow-hidden"
-        style={{ backgroundColor: fic.coverColor || '#0d4f4f' }}
+        className="h-20 w-full flex-shrink-0 relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #5C0000 0%, #990000 55%, #B22222 100%)' }}
       >
-        {/* Subtle gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20" />
-        {/* Fandom name watermark */}
-        <div className="absolute bottom-1.5 left-3 right-3 flex items-end justify-between">
-          <span className="text-white/70 text-xs font-medium truncate max-w-[80%]">{fic.fandom}</span>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <ContentRatingBadge rating={fic.contentRating} />
-            {hasEmotionalDamage && (
-              <span title="Emotional damage" className="text-pink-300">
-                <Zap className="w-3 h-3" fill="currentColor" />
-              </span>
-            )}
-          </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/40" />
+
+        {/* Rating badge — top right */}
+        <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1">
+          <ContentRatingBadge rating={fic.contentRating} />
+          {hasEmotionalDamage && (
+            <span title="Emotional Damage" className="text-pink-300 inline-flex">
+              <Zap className="w-3 h-3" fill="currentColor" />
+            </span>
+          )}
         </div>
-        {/* WIP update badge */}
-        {fic.hasUpdate && (
-          <div className="absolute top-1.5 right-1.5 bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
-            NEW
-          </div>
-        )}
+
+        {/* Fandom — bottom left */}
+        <div className="absolute bottom-2.5 left-3 right-3">
+          <span className="text-white/85 text-[11px] font-medium truncate leading-none block">
+            {fic.fandom}
+          </span>
+        </div>
       </div>
 
       {/* Card body */}
-      <div className="p-3 flex flex-col gap-2 flex-1">
+      <div className="p-3 flex flex-col gap-1.5 flex-1">
         {/* Title + author */}
         <div>
-          <h3 className="text-txt-primary font-semibold text-sm leading-snug line-clamp-2 group-hover:text-accent transition-colors">
+          <h3 className="text-txt-primary font-semibold text-[14px] leading-snug line-clamp-2
+                         transition-colors duration-150
+                         [article:hover_&]:text-accent">
             {fic.title}
           </h3>
-          <p className="text-txt-muted text-xs mt-0.5 truncate">by {fic.author}</p>
+          <p className="text-txt-muted text-[11px] mt-0.5 truncate">by {fic.author}</p>
         </div>
 
         {/* Ship */}
         {primaryShip && (
-          <p className="text-txt-secondary text-xs truncate flex items-center gap-1">
-            <Heart className="w-3 h-3 text-pink-400/70 flex-shrink-0" />
+          <p className="text-txt-secondary text-[11px] truncate flex items-center gap-1">
+            <Heart className="w-3 h-3 text-pink-400 flex-shrink-0" fill="currentColor" />
             {primaryShip}
           </p>
         )}
 
-        {/* Meta row */}
-        <div className="flex items-center gap-2 flex-wrap mt-auto">
-          <span className="text-txt-muted text-xs flex items-center gap-0.5">
+        {/* Word count + chapters */}
+        <div className="flex items-center gap-2 flex-wrap mt-auto pt-1">
+          <span className="text-txt-muted text-[11px] flex items-center gap-1">
             <BookOpen className="w-3 h-3" />
             {formatWordCount(fic.wordCount)}
           </span>
           {fic.chapterCount > 1 && (
-            <span className="text-txt-muted text-xs">
+            <span className="text-txt-muted text-[11px]">
               {fic.chaptersRead > 0 ? `Ch ${fic.chaptersRead}/` : ''}{fic.chapterCount}ch
             </span>
           )}
         </div>
 
-        {/* Status + rating */}
-        <div className="flex items-center justify-between mt-1 pt-2 border-t border-border-subtle">
-          <StatusBadge status={fic.completionStatus} compact />
+        {/* Stars only */}
+        <div className="flex items-center justify-end pt-2 border-t border-border-subtle mt-1">
           {fic.personalRating > 0 ? (
             <StarRating value={fic.personalRating} readonly size={12} />
           ) : (
-            <span className="text-txt-muted text-xs italic">unrated</span>
+            <span className="text-txt-muted text-[11px] italic">unrated</span>
           )}
         </div>
       </div>
