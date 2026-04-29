@@ -54,6 +54,8 @@ const EMPTY_FILTERS = {
   tags: '',
 };
 
+const PAGE_SIZE = 30;
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function EmptyState({ shelf, onAdd }) {
@@ -230,6 +232,56 @@ function MultiSelectDropdown({ label, options, selected, onChange }) {
   );
 }
 
+function Pagination({ page, totalPages, onChange }) {
+  if (totalPages <= 1) return null;
+
+  // Build page list: always show 1, last, and ±2 around current
+  const range = [];
+  for (let i = Math.max(2, page - 2); i <= Math.min(totalPages - 1, page + 2); i++) {
+    range.push(i);
+  }
+  if (range[0] > 2) range.unshift('...');
+  if (range[range.length - 1] < totalPages - 1) range.push('...');
+  range.unshift(1);
+  if (totalPages > 1) range.push(totalPages);
+
+  return (
+    <div className="flex items-center justify-center gap-1 py-3 border-t border-border-subtle bg-base flex-shrink-0">
+      <button
+        onClick={() => onChange(page - 1)}
+        disabled={page === 1}
+        className="px-3 py-1.5 text-sm rounded-lg border border-border text-txt-secondary hover:text-txt-primary hover:bg-elevated disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        ←
+      </button>
+      {range.map((p, i) =>
+        p === '...' ? (
+          <span key={`ellipsis-${i}`} className="px-2 text-txt-muted text-sm">…</span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onChange(p)}
+            className={`w-8 h-8 text-sm rounded-lg transition-colors ${
+              p === page
+                ? 'bg-accent text-white font-medium'
+                : 'text-txt-secondary hover:bg-elevated hover:text-txt-primary'
+            }`}
+          >
+            {p}
+          </button>
+        )
+      )}
+      <button
+        onClick={() => onChange(page + 1)}
+        disabled={page === totalPages}
+        className="px-3 py-1.5 text-sm rounded-lg border border-border text-txt-secondary hover:text-txt-primary hover:bg-elevated disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        →
+      </button>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function MyShelf() {
@@ -261,6 +313,9 @@ export default function MyShelf() {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
 
+  // Pagination
+  const [page, setPage] = useState(1);
+
   // ── Effects ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -284,7 +339,7 @@ export default function MyShelf() {
   const loadFics = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { shelf: activeShelf, sort, order };
+      const params = { shelf: activeShelf, sort, order, limit: 9999 };
       if (search) params.search = search;
       const { data } = await getFics(params);
       setFics(data.fics);
@@ -306,6 +361,9 @@ export default function MyShelf() {
     setSelectedIds(new Set());
     setBulkMode(false);
   }, [activeShelf, view]);
+
+  // Reset to page 1 whenever the result set changes
+  useEffect(() => { setPage(1); }, [activeShelf, search, sort, order, filters]);
 
   // ── Derived data ──────────────────────────────────────────────────────────────
 
@@ -350,6 +408,12 @@ export default function MyShelf() {
   }, [filters]);
 
   const hasActiveFilters = activeFilterCount > 0;
+
+  const totalPages = Math.ceil(filteredFics.length / PAGE_SIZE);
+  const paginatedFics = useMemo(
+    () => filteredFics.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredFics, page]
+  );
 
   const allBulkShelves = useMemo(() => [
     ...STATIC_BULK_SHELVES,
@@ -826,20 +890,22 @@ export default function MyShelf() {
           )
         ) : view === 'grid' ? (
           <div className="px-6 py-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-            {filteredFics.map(fic => (
+            {paginatedFics.map(fic => (
               <FicCard key={fic.id} fic={fic} onClick={setSelectedFic} />
             ))}
-            <button
-              onClick={() => setShowAdd(true)}
-              className="border-2 border-dashed border-border-subtle hover:border-accent rounded-xl flex flex-col items-center justify-center gap-2 py-8 transition-colors group min-h-[180px] bg-white"
-            >
-              <Plus className="w-6 h-6 text-txt-muted group-hover:text-accent transition-colors" />
-              <span className="text-txt-muted text-xs group-hover:text-accent transition-colors">Add fic</span>
-            </button>
+            {page === totalPages && (
+              <button
+                onClick={() => setShowAdd(true)}
+                className="border-2 border-dashed border-border-subtle hover:border-accent rounded-xl flex flex-col items-center justify-center gap-2 py-8 transition-colors group min-h-[180px] bg-white"
+              >
+                <Plus className="w-6 h-6 text-txt-muted group-hover:text-accent transition-colors" />
+                <span className="text-txt-muted text-xs group-hover:text-accent transition-colors">Add fic</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="bg-surface">
-            {filteredFics.map(fic => (
+            {paginatedFics.map(fic => (
               <FicListRow
                 key={fic.id}
                 fic={fic}
@@ -852,6 +918,13 @@ export default function MyShelf() {
           </div>
         )}
       </div>
+
+      {/* ── Pagination ── */}
+      {!loading && filteredFics.length > PAGE_SIZE && (
+        <div style={{ paddingBottom: bulkMode && someSelected ? '64px' : 0 }}>
+          <Pagination page={page} totalPages={totalPages} onChange={p => { setPage(p); }} />
+        </div>
+      )}
 
       {/* ── Sticky bottom bulk action toolbar ── */}
       {bulkMode && someSelected && (
