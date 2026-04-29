@@ -55,6 +55,8 @@ const EMPTY_FILTERS = {
   minStars: '',
   unrated: false,
   tags: '',
+  lastVisitedFrom: '',
+  lastVisitedTo: '',
 };
 
 const PAGE_SIZE = 30;
@@ -395,6 +397,19 @@ export default function MyShelf() {
         const tagSearch = filters.tags.toLowerCase();
         if (!fic.tags?.some(t => t.toLowerCase().includes(tagSearch))) return false;
       }
+      if (filters.lastVisitedFrom || filters.lastVisitedTo) {
+        if (!fic.lastVisited) return false;
+        const ficDate = new Date(fic.lastVisited);
+        if (isNaN(ficDate.getTime())) return false;
+        if (filters.lastVisitedFrom) {
+          const [yr, mo] = filters.lastVisitedFrom.split('-').map(Number);
+          if (ficDate < new Date(yr, mo - 1, 1)) return false;
+        }
+        if (filters.lastVisitedTo) {
+          const [yr, mo] = filters.lastVisitedTo.split('-').map(Number);
+          if (ficDate >= new Date(yr, mo, 1)) return false; // exclusive end: first day of next month
+        }
+      }
       return true;
     });
   }, [fics, filters]);
@@ -407,6 +422,7 @@ export default function MyShelf() {
     if (filters.minWordCount !== '' || filters.maxWordCount !== '') n++;
     if (filters.minStars !== '' || filters.unrated) n++;
     if (filters.tags) n++;
+    if (filters.lastVisitedFrom !== '' || filters.lastVisitedTo !== '') n++;
     return n;
   }, [filters]);
 
@@ -443,6 +459,17 @@ export default function MyShelf() {
       chips.push({ label: `${filters.minStars}★+`, onRemove: () => setFilters(f => ({ ...f, minStars: '' })) });
     if (filters.tags)
       chips.push({ label: `Tag: "${filters.tags}"`, onRemove: () => setFilters(f => ({ ...f, tags: '' })) });
+    if (filters.lastVisitedFrom !== '' || filters.lastVisitedTo !== '') {
+      const fmt = (ym) => {
+        if (!ym) return null;
+        const [yr, mo] = ym.split('-');
+        return new Date(yr, mo - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      };
+      const from = fmt(filters.lastVisitedFrom);
+      const to   = fmt(filters.lastVisitedTo);
+      const label = from && to ? `Visited: ${from} – ${to}` : from ? `Visited: from ${from}` : `Visited: until ${to}`;
+      chips.push({ label, onRemove: () => setFilters(f => ({ ...f, lastVisitedFrom: '', lastVisitedTo: '' })) });
+    }
     return chips;
   }, [filters]);
 
@@ -817,6 +844,43 @@ export default function MyShelf() {
                 value={filters.tags}
                 onChange={e => setFilters(f => ({ ...f, tags: e.target.value }))}
               />
+            </div>
+
+            {/* Last Visited date range */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.09em] text-txt-muted">Last Visited</span>
+              <div className="flex items-center gap-1.5">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[9px] text-txt-muted uppercase tracking-wider">From</span>
+                  <input
+                    type="month"
+                    className="text-xs border border-border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-accent/30"
+                    value={filters.lastVisitedFrom}
+                    max={filters.lastVisitedTo || undefined}
+                    onChange={e => setFilters(f => ({ ...f, lastVisitedFrom: e.target.value }))}
+                  />
+                </div>
+                <span className="text-txt-muted text-xs mt-4">–</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[9px] text-txt-muted uppercase tracking-wider">To</span>
+                  <input
+                    type="month"
+                    className="text-xs border border-border rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-accent/30"
+                    value={filters.lastVisitedTo}
+                    min={filters.lastVisitedFrom || undefined}
+                    onChange={e => setFilters(f => ({ ...f, lastVisitedTo: e.target.value }))}
+                  />
+                </div>
+                {(filters.lastVisitedFrom || filters.lastVisitedTo) && (
+                  <button
+                    onClick={() => setFilters(f => ({ ...f, lastVisitedFrom: '', lastVisitedTo: '' }))}
+                    className="text-txt-muted hover:text-accent mt-4 flex-shrink-0"
+                    title="Clear date range"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
