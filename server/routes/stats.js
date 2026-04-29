@@ -11,18 +11,17 @@ router.get('/', (req, res) => {
   const year = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
 
   // Total counts
-  // NOTE: total_read and total_words_read scope to 'read' + 'history' shelves only.
-  // Fics on any other shelf (reading, want-to-read, dnf, re-reading) or with no shelf
-  // do NOT count toward completed totals. Currently-reading words are tracked separately.
+  // NOTE: stats only count fics explicitly on the 'read' shelf.
+  // History, want-to-read, reading, dnf, re-reading do NOT count toward totals.
   const totals = db.prepare(`
     SELECT
       COUNT(*) as total_fics,
-      COUNT(CASE WHEN shelf IN ('read', 'history') THEN 1 END) as total_read,
+      COUNT(CASE WHEN shelf = 'read' THEN 1 END) as total_read,
       COUNT(CASE WHEN shelf = 'reading' THEN 1 END) as currently_reading,
       COUNT(CASE WHEN shelf = 'want-to-read' THEN 1 END) as want_to_read,
       COUNT(CASE WHEN shelf = 'dnf' THEN 1 END) as dnf,
       COUNT(CASE WHEN shelf = 're-reading' THEN 1 END) as rereading,
-      COALESCE(SUM(CASE WHEN shelf IN ('read', 'history') THEN word_count ELSE 0 END), 0) as total_words_read,
+      COALESCE(SUM(CASE WHEN shelf = 'read' THEN word_count ELSE 0 END), 0) as total_words_read,
       COALESCE(SUM(CASE WHEN shelf = 'reading' THEN word_count ELSE 0 END), 0) as words_in_progress,
       COALESCE(AVG(CASE WHEN personal_rating > 0 THEN personal_rating END), 0) as avg_rating
     FROM fics WHERE user_id = ?
@@ -33,7 +32,7 @@ router.get('/', (req, res) => {
     SELECT
       COUNT(*) as fics_this_year,
       COALESCE(SUM(word_count), 0) as words_this_year
-    FROM fics WHERE user_id = ? AND shelf IN ('read', 'history')
+    FROM fics WHERE user_id = ? AND shelf = 'read'
     AND (
       date_finished LIKE ?
       OR ((date_finished IS NULL OR date_finished = '') AND added_at LIKE ?)
@@ -72,7 +71,7 @@ router.get('/', (req, res) => {
       COUNT(*) as fics,
       COALESCE(SUM(word_count), 0) as words
     FROM fics
-    WHERE user_id = ? AND shelf IN ('read', 'history')
+    WHERE user_id = ? AND shelf = 'read'
     AND (
       date_finished LIKE ?
       OR ((date_finished IS NULL OR date_finished = '') AND added_at LIKE ?)
@@ -142,7 +141,7 @@ router.get('/', (req, res) => {
 
   // V2: Average word count — read + history only
   const avgWordCount = db.prepare(
-    `SELECT ROUND(AVG(word_count)) as avg FROM fics WHERE user_id = ? AND shelf IN ('read', 'history') AND word_count > 0`
+    `SELECT ROUND(AVG(word_count)) as avg FROM fics WHERE user_id = ? AND shelf = 'read' AND word_count > 0`
   ).get(userId);
 
   // V2: Average word count by year — read + history only
@@ -151,18 +150,18 @@ router.get('/', (req, res) => {
       CAST(strftime('%Y', COALESCE(NULLIF(date_finished,''), added_at)) AS TEXT) as yr,
       ROUND(AVG(word_count)) as avg_words,
       COUNT(*) as fic_count
-    FROM fics WHERE user_id = ? AND shelf IN ('read', 'history') AND word_count > 0
+    FROM fics WHERE user_id = ? AND shelf = 'read' AND word_count > 0
     GROUP BY yr ORDER BY yr DESC LIMIT 5
   `).all(userId);
 
   // V2: Longest fic ever read (trophy card) — read + history only
   const longestFic = db.prepare(
-    `SELECT id, title, author, fandom, word_count, cover_color FROM fics WHERE user_id = ? AND shelf IN ('read', 'history') AND word_count > 0 ORDER BY word_count DESC LIMIT 1`
+    `SELECT id, title, author, fandom, word_count, cover_color FROM fics WHERE user_id = ? AND shelf = 'read' AND word_count > 0 ORDER BY word_count DESC LIMIT 1`
   ).get(userId);
 
   // V2: Reading pace (words/day since first completed fic) — read + history only
   const firstFinished = db.prepare(
-    `SELECT MIN(COALESCE(NULLIF(date_finished,''), added_at)) as first_date FROM fics WHERE user_id = ? AND shelf IN ('read', 'history')`
+    `SELECT MIN(COALESCE(NULLIF(date_finished,''), added_at)) as first_date FROM fics WHERE user_id = ? AND shelf = 'read'`
   ).get(userId);
   let readingPaceWpd = null;
   if (firstFinished?.first_date && totals.total_words_read > 0) {
