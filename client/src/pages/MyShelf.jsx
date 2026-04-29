@@ -26,10 +26,13 @@ const SHELF_TABS = [
 ];
 
 const SORT_OPTIONS = [
-  { value: 'added_at',        label: 'Date Added' },
-  { value: 'word_count',      label: 'Word Count' },
-  { value: 'personal_rating', label: 'My Rating' },
-  { value: 'title',           label: 'Title' },
+  { value: 'added_at',           label: 'Date Added' },
+  { value: 'word_count',         label: 'Word Count' },
+  { value: 'personal_rating',    label: 'My Rating' },
+  { value: 'title',              label: 'Title' },
+  { value: 'last_visited',       label: 'Last Visited' },
+  { value: 'last_updated_date',  label: 'Last Updated (AO3)' },
+  { value: 'total_visits',       label: 'Total Visits' },
 ];
 
 const STATIC_BULK_SHELVES = [

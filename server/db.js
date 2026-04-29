@@ -206,4 +206,9 @@ try { db.exec('ALTER TABLE users ADD COLUMN onboarding_done INTEGER DEFAULT 0');
 try { db.exec('ALTER TABLE users ADD COLUMN banner_dismissed INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN last_changelog_viewed_at DATETIME DEFAULT NULL'); } catch {}
 
+// V3: fic description/summary + AO3 history stats for sorting
+try { db.exec("ALTER TABLE fics ADD COLUMN description TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE fics ADD COLUMN last_visited TEXT DEFAULT ''"); } catch {}
+try { db.exec('ALTER TABLE fics ADD COLUMN total_visits INTEGER DEFAULT 0'); } catch {}
+
 module.exports = db;

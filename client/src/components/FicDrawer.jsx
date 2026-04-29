@@ -177,6 +177,16 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
               )}
             </div>
 
+            {/* Description / summary */}
+            {fic.description && (
+              <div>
+                <FieldLabel>Description</FieldLabel>
+                <div className="text-sm leading-relaxed text-txt-secondary bg-elevated rounded-xl px-4 py-3 border border-border-subtle italic">
+                  {fic.description}
+                </div>
+              </div>
+            )}
+
             {/* Ships + characters */}
             {(fic.ships?.length > 0 || fic.characters?.length > 0) && (
               <div className="space-y-1.5">
@@ -216,6 +226,12 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
               )}
               {fic.lastUpdatedDate && (
                 <MetaRow label="Updated"><span>{formatDate(fic.lastUpdatedDate)}</span></MetaRow>
+              )}
+              {fic.lastVisited && (
+                <MetaRow label="Last Visited"><span>{formatDate(fic.lastVisited)}</span></MetaRow>
+              )}
+              {fic.totalVisits > 0 && (
+                <MetaRow label="Visits"><span>{fic.totalVisits} {fic.totalVisits === 1 ? 'time' : 'times'}</span></MetaRow>
               )}
               {fic.dateStarted && (
                 <MetaRow label="Started"><span>{formatDate(fic.dateStarted)}</span></MetaRow>

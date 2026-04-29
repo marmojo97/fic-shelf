@@ -44,6 +44,10 @@ function parseFic(fic) {
     lastCheckedAt:    fic.last_checked_at,
     hasUpdate:        Boolean(fic.has_update),
     ao3ChapterCountCached: fic.ao3_chapter_count_cached,
+    // V3 columns
+    description:      fic.description || '',
+    lastVisited:      fic.last_visited || '',
+    totalVisits:      fic.total_visits || 0,
   };
 }
 
@@ -133,7 +137,11 @@ router.get('/', (req, res) => {
     params.push(s, s, s);
   }
 
-  const validSorts = { added_at: 'added_at', word_count: 'word_count', personal_rating: 'personal_rating', title: 'title', updated_at: 'updated_at' };
+  const validSorts = {
+    added_at: 'added_at', word_count: 'word_count', personal_rating: 'personal_rating',
+    title: 'title', updated_at: 'updated_at',
+    last_updated_date: 'last_updated_date', last_visited: 'last_visited', total_visits: 'total_visits',
+  };
   const sortCol = validSorts[sort] || 'added_at';
   const sortDir = order === 'asc' ? 'ASC' : 'DESC';
 

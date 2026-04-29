@@ -103,6 +103,9 @@ function mapAo3Row(row) {
   const lastVisited  = get('Last Visited', 'LastVisited', 'Date Visited', 'Date Read') || '';
   const totalVisits  = parseInt(get('Total Visits', 'TotalVisits', 'Visits') || '1') || 1;
 
+  // Description/summary — from the updated scraper's "Summary" column
+  const description  = get('Summary', 'Description', 'Work Summary', 'Notes') || '';
+
   return {
     title: get('Title', 'Work Title'),
     author,
@@ -122,6 +125,7 @@ function mapAo3Row(row) {
     lastUpdatedDate: get('Last Updated', 'Updated', 'Update Date') || '',
     lastVisited,
     totalVisits,
+    description,
   };
 }
 
@@ -220,8 +224,9 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
         id, user_id, title, author, fandom, ships, characters, word_count,
         chapter_count, chapters_read, completion_status, content_rating,
         content_warnings, tags, language, series_name, source_url, source_platform,
-        last_updated_date, shelf, personal_rating, cover_color
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        last_updated_date, shelf, personal_rating, cover_color,
+        description, last_visited, total_visits
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, userId, fic.title, fic.author || '', fic.fandom || '',
       JSON.stringify(fic.ships || []), JSON.stringify(fic.characters || []),
@@ -230,7 +235,8 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
       JSON.stringify(fic.contentWarnings || []), JSON.stringify(fic.tags || []),
       fic.language || 'English', fic.seriesName || '', fic.sourceUrl || '', 'ao3',
       fic.lastUpdatedDate || '', defaultShelf, 0,
-      getFandomColor(fic.fandom || '')
+      getFandomColor(fic.fandom || ''),
+      fic.description || '', fic.lastVisited || '', fic.totalVisits || 0
     );
 
     importedFics.push({
