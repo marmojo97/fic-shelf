@@ -84,6 +84,13 @@ export default function FicListRow({ fic, onClick, selectable, selected, onSelec
         <StatusBadge status={fic.completionStatus} compact />
       </div>
 
+      {/* Last visited */}
+      <div className="hidden lg:block w-24 flex-shrink-0 text-right">
+        <span className="text-txt-muted text-xs">
+          {fic.lastVisited ? fic.lastVisited : '—'}
+        </span>
+      </div>
+
       {/* Star rating */}
       <div className="w-20 flex-shrink-0 flex justify-end">
         {fic.personalRating > 0 ? (

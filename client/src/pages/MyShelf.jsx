@@ -931,6 +931,7 @@ export default function MyShelf() {
           <div className="hidden sm:block w-16 text-right">Words</div>
           <div className="hidden md:block w-20">Rating</div>
           <div className="hidden sm:block w-24 text-center">Status</div>
+          <div className="hidden lg:block w-24 text-right">Visited</div>
           <div className="w-20 text-right">Stars</div>
         </div>
       )}
