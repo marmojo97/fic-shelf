@@ -198,10 +198,12 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
   }
 
   const userId = req.userId;
+  // 'incremental' = skip fics older than last import | 'all' = import everything (dupes still skipped)
+  const mode = req.body.mode === 'incremental' ? 'incremental' : 'all';
 
-  // Fetch the last import cutoff for this user — used to skip old fics on re-import
+  // Fetch the last import cutoff — only applied in incremental mode
   const userData = db.prepare('SELECT last_import_at FROM users WHERE id = ?').get(userId);
-  const lastImportAt = userData?.last_import_at || null;
+  const lastImportAt = mode === 'incremental' ? (userData?.last_import_at || null) : null;
 
   // Always import to "history" — user sorts into proper shelves in the next step
   const defaultShelf = 'history';

@@ -124,6 +124,10 @@ export default function ImportModal({ onClose, onImported }) {
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef(null);
 
+  // Import mode — only shown when a previous import exists
+  // 'incremental' = only fics visited since last import | 'all' = everything (dupes skipped)
+  const [importMode, setImportMode] = useState('incremental');
+
   // Bulk sort state
   const [dateRange, setDateRange] = useState('all');
   const [selected, setSelected] = useState(new Set());
@@ -159,7 +163,8 @@ export default function ImportModal({ onClose, onImported }) {
   const handleConfirm = async () => {
     setStep('importing');
     try {
-      const { data } = await confirmAo3Csv(file, 'history');
+      const mode = preview?.lastImportAt ? importMode : 'all';
+      const { data } = await confirmAo3Csv(file, 'history', mode);
       setResult(data);
       setSelected(new Set());
       setAssignments({});
@@ -329,25 +334,80 @@ export default function ImportModal({ onClose, onImported }) {
                 </div>
               </div>
 
-              {preview.lastImportAt && (
-                <div className="bg-teal-900/30 border border-teal-700/40 rounded-xl p-3 text-xs text-teal-300 flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-teal-400" />
-                  <span>
-                    Your last import was <span className="font-semibold text-teal-200">{formatDate(preview.lastImportAt)}</span>.
-                    Only fics visited after that date will be added — duplicates are automatically skipped.
-                  </span>
+              {/* Mode picker — only shown when there's a previous import */}
+              {preview.lastImportAt ? (
+                <div className="space-y-2">
+                  <p className="text-txt-secondary text-xs font-medium uppercase tracking-wider">What do you want to import?</p>
+
+                  {/* Option A: incremental */}
+                  <button
+                    onClick={() => setImportMode('incremental')}
+                    className={`w-full text-left p-3 rounded-xl border transition-all ${
+                      importMode === 'incremental'
+                        ? 'bg-teal-900/30 border-teal-600/50'
+                        : 'bg-elevated border-border hover:border-border-subtle'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${
+                        importMode === 'incremental' ? 'border-teal-400' : 'border-txt-muted'
+                      }`}>
+                        {importMode === 'incremental' && <div className="w-2 h-2 rounded-full bg-teal-400" />}
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${importMode === 'incremental' ? 'text-teal-200' : 'text-txt-primary'}`}>
+                          Only new fics
+                        </p>
+                        <p className="text-xs text-txt-muted mt-0.5">
+                          Fics visited since <span className="text-txt-secondary">{formatDate(preview.lastImportAt)}</span> — perfect for weekly updates
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Option B: all */}
+                  <button
+                    onClick={() => setImportMode('all')}
+                    className={`w-full text-left p-3 rounded-xl border transition-all ${
+                      importMode === 'all'
+                        ? 'bg-accent/10 border-accent/40'
+                        : 'bg-elevated border-border hover:border-border-subtle'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${
+                        importMode === 'all' ? 'border-accent' : 'border-txt-muted'
+                      }`}>
+                        {importMode === 'all' && <div className="w-2 h-2 rounded-full bg-accent" />}
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${importMode === 'all' ? 'text-txt-primary' : 'text-txt-primary'}`}>
+                          Import everything
+                        </p>
+                        <p className="text-xs text-txt-muted mt-0.5">
+                          All {preview.total} fics in this file — duplicates already in your library are automatically skipped
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 text-xs text-txt-secondary">
+                  All {preview.total} fics will be added to your <span className="font-semibold text-txt-primary">History</span> shelf.
+                  Duplicates are automatically skipped.
                 </div>
               )}
 
-              <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 text-xs text-txt-secondary">
-                All fics will be added to your <span className="font-semibold text-txt-primary">History</span> shelf.
-                After importing you'll get a chance to sort them into Read, Want to Read, or Currently Reading.
+              <div className="bg-elevated rounded-xl p-3 text-xs text-txt-muted">
+                After importing you'll sort fics into Read, Want to Read, or Currently Reading.
               </div>
 
               <div className="flex gap-2">
                 <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
                 <button onClick={handleConfirm} className="btn-primary flex-1">
-                  Import {preview.total} fics
+                  {preview.lastImportAt && importMode === 'incremental'
+                    ? 'Import new fics'
+                    : `Import ${preview.total} fics`}
                 </button>
               </div>
             </>

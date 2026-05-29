@@ -66,10 +66,11 @@ export const previewAo3Csv = (file) => {
   fd.append('file', file);
   return api.post('/import/ao3-csv/preview', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
 };
-export const confirmAo3Csv = (file, shelf) => {
+export const confirmAo3Csv = (file, shelf, mode = 'all') => {
   const fd = new FormData();
   fd.append('file', file);
   fd.append('shelf', shelf);
+  fd.append('mode', mode); // 'all' | 'incremental'
   return api.post('/import/ao3-csv/confirm', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
 };
 export const bulkSortFics = (assignments) => api.post('/import/bulk-sort', { assignments });
