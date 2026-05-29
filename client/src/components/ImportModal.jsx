@@ -329,6 +329,16 @@ export default function ImportModal({ onClose, onImported }) {
                 </div>
               </div>
 
+              {preview.lastImportAt && (
+                <div className="bg-teal-900/30 border border-teal-700/40 rounded-xl p-3 text-xs text-teal-300 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-teal-400" />
+                  <span>
+                    Your last import was <span className="font-semibold text-teal-200">{formatDate(preview.lastImportAt)}</span>.
+                    Only fics visited after that date will be added — duplicates are automatically skipped.
+                  </span>
+                </div>
+              )}
+
               <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 text-xs text-txt-secondary">
                 All fics will be added to your <span className="font-semibold text-txt-primary">History</span> shelf.
                 After importing you'll get a chance to sort them into Read, Want to Read, or Currently Reading.
@@ -356,13 +366,23 @@ export default function ImportModal({ onClose, onImported }) {
           {step === 'sort' && result && (
             <>
               {/* Summary */}
-              <div className="bg-elevated rounded-xl p-3 space-y-0.5">
+              <div className="bg-elevated rounded-xl p-3 space-y-1">
                 <p className="text-txt-primary text-sm font-semibold">
-                  {result.imported} fics imported to History
-                  {result.skipped > 0 && (
-                    <span className="text-txt-muted font-normal"> · {result.skipped} duplicates skipped</span>
-                  )}
+                  {result.imported} new fic{result.imported !== 1 ? 's' : ''} imported to History
                 </p>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                  {result.updated > 0 && (
+                    <span className="text-teal-400 text-xs">
+                      ↻ {result.updated} visit date{result.updated !== 1 ? 's' : ''} refreshed
+                    </span>
+                  )}
+                  {result.skipped > 0 && (
+                    <span className="text-txt-muted text-xs">{result.skipped} duplicate{result.skipped !== 1 ? 's' : ''} skipped</span>
+                  )}
+                  {result.tooOld > 0 && (
+                    <span className="text-txt-muted text-xs">{result.tooOld} older fic{result.tooOld !== 1 ? 's' : ''} skipped</span>
+                  )}
+                </div>
                 <p className="text-txt-muted text-xs">
                   Select fics below to move them to the right shelf. Everything else stays in History.
                 </p>

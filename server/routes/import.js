@@ -59,8 +59,8 @@ function parseTagList(str) {
 
 // Flexible column getter — normalises whitespace/case/punctuation/BOM
 function makeGetter(row) {
-  // Strip BOM (\uFEFF), non-breaking spaces, and other invisible characters
-  const normKey = (k) => k.replace(/[\uFEFF\u00A0]/g, '').toLowerCase().replace(/[\s_\-]/g, '');
+  // Strip BOM (﻿), non-breaking spaces, and other invisible characters
+  const normKey = (k) => k.replace(/[﻿ ]/g, '').toLowerCase().replace(/[\s_\-]/g, '');
   const rowKeys = Object.keys(row);
   return (...keys) => {
     for (const k of keys) {
@@ -148,7 +148,7 @@ router.post('/ao3-csv/preview', upload.single('file'), (req, res) => {
 
   let records;
   try {
-    records = parse(req.file.buffer.toString('utf-8').replace(/^\uFEFF/, ''), {
+    records = parse(req.file.buffer.toString('utf-8').replace(/^﻿/, ''), {
       columns: true,
       skip_empty_lines: true,
       trim: true,
@@ -169,10 +169,14 @@ router.post('/ao3-csv/preview', upload.single('file'), (req, res) => {
 
   const deduped = deduplicateRecords(records);
 
+  // Return last_import_at so the client can show the incremental import banner
+  const user = db.prepare('SELECT last_import_at FROM users WHERE id = ?').get(req.userId);
+
   res.json({
     total: deduped.length,
     preview: deduped.slice(0, 20).map(r => mapAo3Row(r)),
     columns: cols,
+    lastImportAt: user?.last_import_at || null,
   });
 });
 
@@ -182,7 +186,7 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
 
   let records;
   try {
-    records = parse(req.file.buffer.toString('utf-8').replace(/^\uFEFF/, ''), {
+    records = parse(req.file.buffer.toString('utf-8').replace(/^﻿/, ''), {
       columns: true,
       skip_empty_lines: true,
       trim: true,
@@ -194,10 +198,17 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
   }
 
   const userId = req.userId;
+
+  // Fetch the last import cutoff for this user — used to skip old fics on re-import
+  const userData = db.prepare('SELECT last_import_at FROM users WHERE id = ?').get(userId);
+  const lastImportAt = userData?.last_import_at || null;
+
   // Always import to "history" — user sorts into proper shelves in the next step
   const defaultShelf = 'history';
   let imported = 0;
+  let updated = 0;
   let skipped = 0;
+  let tooOld = 0;
   const skippedTitles = [];
   const importedFics = [];
 
@@ -207,17 +218,35 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
     const fic = mapAo3Row(row);
     if (!fic.title) continue;
 
-    // Check for duplicate already in this user's library
+    // Check if this fic already exists in the user's library
     const existing = fic.sourceUrl
-      ? db.prepare('SELECT id FROM fics WHERE user_id = ? AND source_url = ?').get(userId, fic.sourceUrl)
-      : db.prepare('SELECT id FROM fics WHERE user_id = ? AND LOWER(title) = ? AND LOWER(author) = ?').get(userId, fic.title.toLowerCase(), (fic.author || '').toLowerCase());
+      ? db.prepare('SELECT id, last_visited, total_visits FROM fics WHERE user_id = ? AND source_url = ?').get(userId, fic.sourceUrl)
+      : db.prepare('SELECT id, last_visited, total_visits FROM fics WHERE user_id = ? AND LOWER(title) = ? AND LOWER(author) = ?').get(userId, fic.title.toLowerCase(), (fic.author || '').toLowerCase());
 
     if (existing) {
-      skipped++;
-      skippedTitles.push(fic.title);
+      // Edge case: fic already in library — update visit stats if CSV has a newer date
+      const csvDate = fic.lastVisited || '';
+      const dbDate  = existing.last_visited || '';
+      if (csvDate && (!dbDate || csvDate > dbDate)) {
+        db.prepare(
+          'UPDATE fics SET last_visited = ?, total_visits = ? WHERE id = ? AND user_id = ?'
+        ).run(csvDate, fic.totalVisits || existing.total_visits, existing.id, userId);
+        updated++;
+      } else {
+        skipped++;
+        skippedTitles.push(fic.title);
+      }
       continue;
     }
 
+    // Incremental import: skip fics that are older than the last import cutoff
+    // (TamperMonkey already filters these out, but this is the server-side safety net)
+    if (lastImportAt && fic.lastVisited && fic.lastVisited < lastImportAt) {
+      tooOld++;
+      continue;
+    }
+
+    // New fic — insert it
     const id = uuidv4();
     db.prepare(`
       INSERT INTO fics (
@@ -255,12 +284,18 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
     imported++;
   }
 
+  // Stamp today as the new import cutoff so future imports only pull newer fics
+  const today = new Date().toISOString().split('T')[0];
+  db.prepare('UPDATE users SET last_import_at = ? WHERE id = ?').run(today, userId);
+
   res.json({
     imported,
+    updated,
     skipped,
+    tooOld,
     skippedTitles: skippedTitles.slice(0, 20),
     importedFics,
-    message: `Imported ${imported} fic${imported !== 1 ? 's' : ''}. Skipped ${skipped} duplicate${skipped !== 1 ? 's' : ''}.`,
+    message: `Imported ${imported} new fic${imported !== 1 ? 's' : ''}${updated ? `, refreshed ${updated} visit date${updated !== 1 ? 's' : ''}` : ''}. Skipped ${skipped} duplicate${skipped !== 1 ? 's' : ''}${tooOld ? ` and ${tooOld} older fic${tooOld !== 1 ? 's' : ''}` : ''}.`,
   });
 });
 
