@@ -198,12 +198,10 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
   }
 
   const userId = req.userId;
-  // 'incremental' = skip fics older than last import | 'all' = import everything (dupes still skipped)
-  const mode = req.body.mode === 'incremental' ? 'incremental' : 'all';
 
-  // Fetch the last import cutoff — only applied in incremental mode
-  const userData = db.prepare('SELECT last_import_at FROM users WHERE id = ?').get(userId);
-  const lastImportAt = mode === 'incremental' ? (userData?.last_import_at || null) : null;
+  // Optional date-range filter — both are YYYY-MM-DD strings, inclusive
+  const fromDate = req.body.fromDate || null;
+  const toDate   = req.body.toDate   || null;
 
   // Always import to "history" — user sorts into proper shelves in the next step
   const defaultShelf = 'history';
@@ -241,11 +239,13 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
       continue;
     }
 
-    // Incremental import: skip fics that are older than the last import cutoff
-    // (TamperMonkey already filters these out, but this is the server-side safety net)
-    if (lastImportAt && fic.lastVisited && fic.lastVisited < lastImportAt) {
-      tooOld++;
-      continue;
+    // Date-range filter: skip fics whose lastVisited falls outside the requested window
+    if (fromDate || toDate) {
+      const ficDate = fic.lastVisited || '';
+      if (fromDate && ficDate && ficDate < fromDate) { tooOld++; continue; }
+      if (toDate   && ficDate && ficDate > toDate)   { tooOld++; continue; }
+      // If fic has no lastVisited date and a range is set, skip it too
+      if (!ficDate) { tooOld++; continue; }
     }
 
     // New fic — insert it
@@ -297,7 +297,7 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
     tooOld,
     skippedTitles: skippedTitles.slice(0, 20),
     importedFics,
-    message: `Imported ${imported} new fic${imported !== 1 ? 's' : ''}${updated ? `, refreshed ${updated} visit date${updated !== 1 ? 's' : ''}` : ''}. Skipped ${skipped} duplicate${skipped !== 1 ? 's' : ''}${tooOld ? ` and ${tooOld} older fic${tooOld !== 1 ? 's' : ''}` : ''}.`,
+    message: `Imported ${imported} new fic${imported !== 1 ? 's' : ''}${updated ? `, refreshed ${updated} visit date${updated !== 1 ? 's' : ''}` : ''}. Skipped ${skipped} duplicate${skipped !== 1 ? 's' : ''}${tooOld ? ` and ${tooOld} outside date range` : ''}.`,
   });
 });
 

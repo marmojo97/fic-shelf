@@ -124,9 +124,10 @@ export default function ImportModal({ onClose, onImported }) {
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef(null);
 
-  // Import mode — only shown when a previous import exists
-  // 'incremental' = only fics visited since last import | 'all' = everything (dupes skipped)
-  const [importMode, setImportMode] = useState('incremental');
+  // Import mode: 'all' = everything (dupes skipped) | 'range' = filter by last visited date
+  const [importMode, setImportMode] = useState('all');
+  const [rangeFrom, setRangeFrom] = useState(''); // YYYY-MM
+  const [rangeTo, setRangeTo]     = useState(''); // YYYY-MM
 
   // Bulk sort state
   const [dateRange, setDateRange] = useState('all');
@@ -163,8 +164,12 @@ export default function ImportModal({ onClose, onImported }) {
   const handleConfirm = async () => {
     setStep('importing');
     try {
-      const mode = preview?.lastImportAt ? importMode : 'all';
-      const { data } = await confirmAo3Csv(file, 'history', mode);
+      // Build date bounds from the range picker (YYYY-MM → first/last day of month)
+      const fromDate = importMode === 'range' && rangeFrom ? `${rangeFrom}-01` : '';
+      const toDate   = importMode === 'range' && rangeTo
+        ? (() => { const [y, m] = rangeTo.split('-').map(Number); return new Date(y, m, 0).toISOString().slice(0, 10); })()
+        : '';
+      const { data } = await confirmAo3Csv(file, 'history', fromDate, toDate);
       setResult(data);
       setSelected(new Set());
       setAssignments({});
@@ -334,80 +339,94 @@ export default function ImportModal({ onClose, onImported }) {
                 </div>
               </div>
 
-              {/* Mode picker — only shown when there's a previous import */}
-              {preview.lastImportAt ? (
-                <div className="space-y-2">
-                  <p className="text-txt-secondary text-xs font-medium uppercase tracking-wider">What do you want to import?</p>
+              {/* Import mode picker */}
+              <div className="space-y-2">
+                <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">What would you like to import?</p>
 
-                  {/* Option A: incremental */}
-                  <button
-                    onClick={() => setImportMode('incremental')}
-                    className={`w-full text-left p-3 rounded-xl border transition-all ${
-                      importMode === 'incremental'
-                        ? 'bg-teal-900/30 border-teal-600/50'
-                        : 'bg-elevated border-border hover:border-border-subtle'
-                    }`}
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${
-                        importMode === 'incremental' ? 'border-teal-400' : 'border-txt-muted'
-                      }`}>
-                        {importMode === 'incremental' && <div className="w-2 h-2 rounded-full bg-teal-400" />}
+                {/* Option A: all fics */}
+                <button
+                  onClick={() => setImportMode('all')}
+                  className={`w-full text-left p-3 rounded-xl border transition-all ${
+                    importMode === 'all'
+                      ? 'bg-accent/10 border-accent/40'
+                      : 'bg-elevated border-border hover:border-accent/20'
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${
+                      importMode === 'all' ? 'border-accent' : 'border-txt-muted'
+                    }`}>
+                      {importMode === 'all' && <div className="w-2 h-2 rounded-full bg-accent" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-txt-primary">All fics</p>
+                      <p className="text-xs text-txt-muted mt-0.5">
+                        All {preview.total} fics in this file — duplicates already in your library are automatically skipped
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Option B: date range */}
+                <button
+                  onClick={() => setImportMode('range')}
+                  className={`w-full text-left p-3 rounded-xl border transition-all ${
+                    importMode === 'range'
+                      ? 'bg-teal-900/30 border-teal-600/50'
+                      : 'bg-elevated border-border hover:border-accent/20'
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${
+                      importMode === 'range' ? 'border-teal-400' : 'border-txt-muted'
+                    }`}>
+                      {importMode === 'range' && <div className="w-2 h-2 rounded-full bg-teal-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-txt-primary">Select a date range</p>
+                      <p className="text-xs text-txt-muted mt-0.5">Only import fics visited within a specific time period</p>
+                    </div>
+                  </div>
+
+                  {/* Date pickers — shown when range is selected */}
+                  {importMode === 'range' && (
+                    <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex-1">
+                        <label className="text-xs text-txt-muted block mb-1">From</label>
+                        <input
+                          type="month"
+                          value={rangeFrom}
+                          onChange={(e) => setRangeFrom(e.target.value)}
+                          className="input-field w-full text-sm"
+                        />
                       </div>
-                      <div>
-                        <p className={`text-sm font-medium ${importMode === 'incremental' ? 'text-teal-200' : 'text-txt-primary'}`}>
-                          Only new fics
-                        </p>
-                        <p className="text-xs text-txt-muted mt-0.5">
-                          Fics visited since <span className="text-txt-secondary">{formatDate(preview.lastImportAt)}</span> — perfect for weekly updates
-                        </p>
+                      <span className="text-txt-muted text-sm mt-4">–</span>
+                      <div className="flex-1">
+                        <label className="text-xs text-txt-muted block mb-1">To</label>
+                        <input
+                          type="month"
+                          value={rangeTo}
+                          onChange={(e) => setRangeTo(e.target.value)}
+                          className="input-field w-full text-sm"
+                        />
                       </div>
                     </div>
-                  </button>
-
-                  {/* Option B: all */}
-                  <button
-                    onClick={() => setImportMode('all')}
-                    className={`w-full text-left p-3 rounded-xl border transition-all ${
-                      importMode === 'all'
-                        ? 'bg-accent/10 border-accent/40'
-                        : 'bg-elevated border-border hover:border-border-subtle'
-                    }`}
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${
-                        importMode === 'all' ? 'border-accent' : 'border-txt-muted'
-                      }`}>
-                        {importMode === 'all' && <div className="w-2 h-2 rounded-full bg-accent" />}
-                      </div>
-                      <div>
-                        <p className={`text-sm font-medium ${importMode === 'all' ? 'text-txt-primary' : 'text-txt-primary'}`}>
-                          Import everything
-                        </p>
-                        <p className="text-xs text-txt-muted mt-0.5">
-                          All {preview.total} fics in this file — duplicates already in your library are automatically skipped
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 text-xs text-txt-secondary">
-                  All {preview.total} fics will be added to your <span className="font-semibold text-txt-primary">History</span> shelf.
-                  Duplicates are automatically skipped.
-                </div>
-              )}
-
-              <div className="bg-elevated rounded-xl p-3 text-xs text-txt-muted">
-                After importing you'll sort fics into Read, Want to Read, or Currently Reading.
+                  )}
+                </button>
               </div>
+
+              <p className="text-txt-muted text-xs">
+                After importing you'll sort fics into Read, Want to Read, or Currently Reading.
+              </p>
 
               <div className="flex gap-2">
                 <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-                <button onClick={handleConfirm} className="btn-primary flex-1">
-                  {preview.lastImportAt && importMode === 'incremental'
-                    ? 'Import new fics'
-                    : `Import ${preview.total} fics`}
+                <button
+                  onClick={handleConfirm}
+                  disabled={importMode === 'range' && !rangeFrom && !rangeTo}
+                  className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {importMode === 'range' ? 'Import date range' : `Import all ${preview.total} fics`}
                 </button>
               </div>
             </>
@@ -440,7 +459,7 @@ export default function ImportModal({ onClose, onImported }) {
                     <span className="text-txt-muted text-xs">{result.skipped} duplicate{result.skipped !== 1 ? 's' : ''} skipped</span>
                   )}
                   {result.tooOld > 0 && (
-                    <span className="text-txt-muted text-xs">{result.tooOld} older fic{result.tooOld !== 1 ? 's' : ''} skipped</span>
+                    <span className="text-txt-muted text-xs">{result.tooOld} outside date range</span>
                   )}
                 </div>
                 <p className="text-txt-muted text-xs">

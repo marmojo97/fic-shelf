@@ -66,11 +66,12 @@ export const previewAo3Csv = (file) => {
   fd.append('file', file);
   return api.post('/import/ao3-csv/preview', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
 };
-export const confirmAo3Csv = (file, shelf, mode = 'all') => {
+export const confirmAo3Csv = (file, shelf, fromDate = '', toDate = '') => {
   const fd = new FormData();
   fd.append('file', file);
   fd.append('shelf', shelf);
-  fd.append('mode', mode); // 'all' | 'incremental'
+  if (fromDate) fd.append('fromDate', fromDate); // YYYY-MM-DD, inclusive
+  if (toDate)   fd.append('toDate', toDate);     // YYYY-MM-DD, inclusive
   return api.post('/import/ao3-csv/confirm', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
 };
 export const bulkSortFics = (assignments) => api.post('/import/bulk-sort', { assignments });
