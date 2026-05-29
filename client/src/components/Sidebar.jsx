@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Compass, BarChart2, List, User, LogOut, Bookmark, Upload, Sparkles } from 'lucide-react';
+import { BookOpen, Compass, BarChart2, List, User, LogOut, Bookmark, Upload, Sparkles, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import ImportModal from './ImportModal.jsx';
@@ -126,6 +126,17 @@ export default function Sidebar() {
             <p className="text-txt-muted text-xs truncate">@{user?.username}</p>
           </div>
         </div>
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors w-full ${
+              isActive ? 'text-accent' : 'text-txt-muted hover:text-txt-secondary hover:bg-elevated'
+            }`
+          }
+        >
+          <Settings className="w-4 h-4 flex-shrink-0" />
+          Settings
+        </NavLink>
         <button
           onClick={handleSignOut}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-txt-muted hover:text-txt-secondary hover:bg-elevated transition-colors w-full"

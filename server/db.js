@@ -211,4 +211,10 @@ try { db.exec("ALTER TABLE fics ADD COLUMN description TEXT DEFAULT ''"); } catc
 try { db.exec("ALTER TABLE fics ADD COLUMN last_visited TEXT DEFAULT ''"); } catch {}
 try { db.exec('ALTER TABLE fics ADD COLUMN total_visits INTEGER DEFAULT 0'); } catch {}
 
+// V3: track last CSV import date per user for incremental imports
+try { db.exec('ALTER TABLE users ADD COLUMN last_import_at TEXT DEFAULT NULL'); } catch {}
+
+// V4: personal API token for bookmarklet / mobile access
+try { db.exec('ALTER TABLE users ADD COLUMN api_token TEXT DEFAULT NULL'); } catch {}
+
 module.exports = db;

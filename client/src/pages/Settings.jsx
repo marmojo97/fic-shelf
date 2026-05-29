@@ -1,0 +1,205 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Smartphone, Link, Copy, RefreshCw, CheckCircle2, AlertCircle,
+  Loader2, BookOpen, Info,
+} from 'lucide-react';
+import { getApiToken, regenerateApiToken } from '../api/index.js';
+
+// The API base URL — same logic as api/index.js
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : `${window.location.origin}/api`;
+
+/**
+ * Builds the javascript: bookmarklet URL from the source template.
+ * The source is inlined here as a minified string so no extra fetch is needed.
+ */
+function buildBookmarklet(apiUrl, token) {
+  // Minified bookmarklet logic (same as ao3-bookmarklet-source.js)
+  const src = `(function(){var m=location.href.match(/archiveofourown\\.org\\/works\\/(\\d+)/);if(!m){alert('Open an AO3 work page first!');return;}var id=m[1];var q=function(s){var e=document.querySelector(s);return e?e.textContent.trim():'';};var qa=function(s){return Array.from(document.querySelectorAll(s)).map(function(e){return e.textContent.trim();}).join('; ');};var title=q('h2.title.heading')||q('.title.heading');var author=q('a[rel="author"]')||'Anonymous';var fandoms=qa('.fandom.tags a.tag');var rating=q('.rating.tags a');var warnings=qa('.warning.tags a.tag');var ships=qa('.relationship.tags a.tag');var chars=qa('.character.tags a.tag');var tags=qa('.freeform.tags a.tag');var words=q('dd.words').replace(/,/g,'')||'0';var chaps=q('dd.chapters')||'?/?';var sv=q('dd.status');var comp=sv==='Completed'?'Complete Work':'Work in Progress';var sumEl=document.querySelector('.summary .userstuff')||document.querySelector('blockquote.userstuff');var summary=sumEl?sumEl.textContent.replace(/\\s+/g,' ').trim():'';var today=new Date().toISOString().slice(0,10);var payload={title:title,author:author,fandoms:fandoms,fandom:fandoms.split('; ')[0]||'',rating:rating,warnings:warnings,relationships:ships,characters:chars,freeforms:tags,words:words,chapters:chaps,completion:comp,summary:summary,sourceUrl:'https://archiveofourown.org/works/'+id,lastVisited:today};var t=document.createElement('div');t.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:#1a2e2e;color:#e2e8f0;padding:14px 20px;border-radius:14px;font-family:-apple-system,sans-serif;font-size:14px;max-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.5);border:1px solid #2d4f4f;transition:opacity .3s';t.textContent='Adding to Archivd…';document.body.appendChild(t);fetch('${apiUrl}/fics/quick-add',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${token}'},body:JSON.stringify(payload)}).then(function(r){return r.json();}).then(function(d){if(d.error)throw new Error(d.error);t.style.background='#1a3a2a';t.style.borderColor='#2d7a4f';t.textContent='✓ Added to History shelf!';setTimeout(function(){t.style.opacity='0';setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},300);},2500);}).catch(function(e){t.style.background='#3a1a1a';t.style.borderColor='#7a2d2d';t.textContent='✗ '+(e.message||'Could not add fic');setTimeout(function(){t.style.opacity='0';setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},300);},3500);});})();`;
+  return `javascript:${encodeURIComponent(src)}`;
+}
+
+export default function Settings() {
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadToken = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getApiToken();
+      setToken(data.apiToken);
+    } catch {
+      setError('Could not load your API token. Try refreshing.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadToken(); }, [loadToken]);
+
+  const bookmarkletUrl = token ? buildBookmarklet(API_BASE, token) : '';
+
+  async function handleRegenerate() {
+    if (!confirmRegen) { setConfirmRegen(true); return; }
+    setRegenerating(true);
+    setConfirmRegen(false);
+    try {
+      const { data } = await regenerateApiToken();
+      setToken(data.apiToken);
+    } catch {
+      setError('Could not regenerate token.');
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(bookmarkletUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // fallback: select the textarea
+    }
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+      <div>
+        <h1 className="text-txt-primary text-2xl font-bold">Settings</h1>
+        <p className="text-txt-muted text-sm mt-1">Manage your account and integrations.</p>
+      </div>
+
+      {/* ── Bookmarklet / Mobile section ── */}
+      <section className="bg-surface border border-border rounded-2xl p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Smartphone className="w-5 h-5 text-accent" />
+          </div>
+          <div>
+            <h2 className="text-txt-primary font-semibold">Add fics from your phone</h2>
+            <p className="text-txt-muted text-sm">
+              Tap a bookmarklet while browsing AO3 — it adds the fic to your History shelf instantly.
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="flex items-start gap-2 text-red-400 text-sm bg-red-900/20 rounded-xl p-3">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-txt-muted text-sm py-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Loading your token…</span>
+          </div>
+        ) : token ? (
+          <>
+            {/* Desktop: drag-to-bookmarks */}
+            <div className="hidden sm:block">
+              <p className="text-txt-secondary text-sm font-medium mb-2">
+                On desktop — drag this to your bookmarks bar:
+              </p>
+              <a
+                href={bookmarkletUrl}
+                onClick={(e) => { e.preventDefault(); alert("Drag this link to your bookmarks bar — don't click it here!"); }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-elevated border border-border rounded-xl text-txt-primary text-sm font-medium hover:border-accent/50 cursor-grab active:cursor-grabbing transition-colors"
+                draggable="true"
+              >
+                <BookOpen className="w-4 h-4 text-accent" />
+                + Add to Archivd
+              </a>
+            </div>
+
+            {/* Mobile: copy-the-code instructions */}
+            <div>
+              <p className="text-txt-secondary text-sm font-medium mb-2 flex items-center gap-1.5">
+                On mobile — follow these steps:
+              </p>
+              <ol className="text-txt-muted text-sm space-y-2 list-none">
+                <li className="flex gap-2.5">
+                  <span className="w-5 h-5 bg-accent/20 text-accent rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold">1</span>
+                  <span>Tap <strong className="text-txt-secondary">Copy code</strong> below</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="w-5 h-5 bg-accent/20 text-accent rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold">2</span>
+                  <span>In Safari, bookmark <em>any</em> page (tap Share → Add Bookmark)</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="w-5 h-5 bg-accent/20 text-accent rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold">3</span>
+                  <span>Edit that bookmark: change its name to <strong className="text-txt-secondary">+ Add to Archivd</strong> and paste the copied code as the URL</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="w-5 h-5 bg-accent/20 text-accent rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold">4</span>
+                  <span>While reading a fic on AO3, open your bookmarks and tap it — done!</span>
+                </li>
+              </ol>
+
+              <button
+                onClick={handleCopy}
+                className={`mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  copied
+                    ? 'bg-green-900/30 border border-green-700/40 text-green-400'
+                    : 'bg-elevated border border-border text-txt-primary hover:border-accent/50'
+                }`}
+              >
+                {copied ? (
+                  <><CheckCircle2 className="w-4 h-4" /> Copied!</>
+                ) : (
+                  <><Copy className="w-4 h-4" /> Copy bookmarklet code</>
+                )}
+              </button>
+            </div>
+
+            {/* Security note */}
+            <div className="flex items-start gap-2 text-txt-muted text-xs bg-elevated rounded-xl p-3">
+              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-accent/60" />
+              <span>
+                Your bookmarklet contains a personal token that lets it add fics to your account.
+                Don't share the code with anyone. If you think it's been compromised, regenerate it below.
+              </span>
+            </div>
+
+            {/* Regenerate */}
+            <div className="pt-1 border-t border-border">
+              <button
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                className={`flex items-center gap-2 text-sm transition-colors ${
+                  confirmRegen
+                    ? 'text-red-400 hover:text-red-300'
+                    : 'text-txt-muted hover:text-txt-primary'
+                }`}
+              >
+                {regenerating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                {confirmRegen
+                  ? 'Click again to confirm — old bookmarklet will stop working'
+                  : 'Regenerate token'}
+              </button>
+              {confirmRegen && (
+                <button
+                  onClick={() => setConfirmRegen(false)}
+                  className="text-xs text-txt-muted hover:text-txt-primary mt-1 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </>
+        ) : null}
+      </section>
+    </div>
+  );
+}

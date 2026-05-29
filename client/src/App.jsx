@@ -11,6 +11,7 @@ import Profile from './pages/Profile.jsx';
 import ShareTarget from './pages/ShareTarget.jsx';
 import Changelog from './pages/Changelog.jsx';
 import Admin from './pages/Admin.jsx';
+import Settings from './pages/Settings.jsx';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -49,6 +50,7 @@ function AppRoutes() {
                 <Route path="/reclists" element={<RecLists />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/changelog" element={<Changelog />} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="/share-target" element={<ShareTarget />} />
                 <Route path="*" element={<Navigate to="/shelf" replace />} />
               </Routes>

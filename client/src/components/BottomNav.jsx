@@ -1,13 +1,13 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { BookOpen, Compass, BarChart2, List, User } from 'lucide-react';
+import { BookOpen, Compass, BarChart2, List, Settings } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/shelf', icon: BookOpen, label: 'Shelf' },
   { to: '/discover', icon: Compass, label: 'Discover' },
   { to: '/stats', icon: BarChart2, label: 'Stats' },
   { to: '/reclists', icon: List, label: 'Recs' },
-  { to: '/profile', icon: User, label: 'Profile' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function BottomNav() {

@@ -324,4 +324,68 @@ function getFandomColor(fandom) {
   return colors[Math.abs(hash) % colors.length];
 }
 
+// POST /api/fics/quick-add — bookmarklet endpoint: accepts scraped AO3 page data
+const RATING_MAP_QA = {
+  'General Audiences': 'G', 'Teen And Up Audiences': 'T',
+  'Mature': 'M', 'Explicit': 'E', 'Not Rated': 'T',
+};
+const STATUS_MAP_QA = {
+  'Complete Work': 'complete', 'Work in Progress': 'in-progress',
+  'Completed': 'complete', 'In Progress': 'in-progress',
+};
+
+router.post('/quick-add', (req, res) => {
+  const userId = req.userId;
+  const {
+    title, author, fandom, fandoms, rating, warnings, relationships,
+    characters, freeforms, words, chapters, completion, summary,
+    sourceUrl, lastVisited,
+  } = req.body;
+
+  if (!title) return res.status(400).json({ error: 'title is required' });
+
+  // Duplicate check
+  const existing = sourceUrl
+    ? db.prepare('SELECT id FROM fics WHERE user_id = ? AND source_url = ?').get(userId, sourceUrl)
+    : db.prepare('SELECT id FROM fics WHERE user_id = ? AND LOWER(title) = ?').get(userId, title.toLowerCase());
+
+  if (existing) return res.status(409).json({ error: 'Already in your library', ficId: existing.id });
+
+  const parseList = (str) => str ? str.split(/\s*;\s*/).map(s => s.trim()).filter(Boolean) : [];
+  const parseChaps = (str) => {
+    if (!str) return { read: 0, total: 1 };
+    const [r, t] = String(str).split('/');
+    return { read: parseInt(r) || 0, total: t && t !== '?' ? parseInt(t) : null };
+  };
+
+  const { read: chaptersRead, total: chapterTotal } = parseChaps(chapters);
+  const primaryFandom = (fandoms || fandom || '').split(/\s*[;,]\s*/)[0].trim() || '';
+
+  const id = uuidv4();
+  db.prepare(`
+    INSERT INTO fics (
+      id, user_id, title, author, fandom, ships, characters, word_count,
+      chapter_count, chapters_read, completion_status, content_rating,
+      content_warnings, tags, language, series_name, source_url, source_platform,
+      last_updated_date, shelf, personal_rating, cover_color,
+      description, last_visited, total_visits
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, userId, title, author || '', primaryFandom,
+    JSON.stringify(parseList(relationships)), JSON.stringify(parseList(characters)),
+    parseInt(String(words || '0').replace(/,/g, '')) || 0,
+    chapterTotal || (chaptersRead > 0 ? chaptersRead : 1), chaptersRead,
+    STATUS_MAP_QA[completion] || 'in-progress',
+    RATING_MAP_QA[rating] || 'T',
+    JSON.stringify(parseList(warnings).filter(w => w !== 'No Archive Warnings Apply' && w !== 'Creator Chose Not To Use Archive Warnings')),
+    JSON.stringify(parseList(freeforms)),
+    'English', '', sourceUrl || '', 'ao3',
+    '', 'history', 0,
+    getFandomColor(primaryFandom),
+    summary || '', lastVisited || '', 1
+  );
+
+  res.json({ id, message: 'Added to History shelf' });
+});
+
 module.exports = router;

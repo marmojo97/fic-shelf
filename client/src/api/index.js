@@ -100,6 +100,10 @@ export const markChangelogViewed = () => api.post('/changelog/viewed');
 export const getBetaBanner = () => api.get('/beta-banner');
 export const dismissBetaBanner = () => api.post('/beta-banner/dismiss');
 
+// Settings / API token (for bookmarklet)
+export const getApiToken = () => api.get('/settings/token');
+export const regenerateApiToken = () => api.post('/settings/token/regenerate');
+
 // Admin (uses a separate token stored as archivd_admin_token)
 const adminApi = axios.create({ baseURL: '/api/admin' });
 adminApi.interceptors.request.use((config) => {

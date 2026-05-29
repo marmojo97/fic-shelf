@@ -27,6 +27,7 @@ app.use('/api/ao3', require('./routes/ao3'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/import', require('./routes/import'));
 app.use('/api/social', require('./routes/social'));
+app.use('/api/settings', require('./routes/settings'));
 
 // Beta features
 app.use('/api/admin', require('./routes/admin'));
