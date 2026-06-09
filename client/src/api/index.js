@@ -107,7 +107,7 @@ export const getApiToken = () => api.get('/settings/token');
 export const regenerateApiToken = () => api.post('/settings/token/regenerate');
 
 // Admin (uses a separate token stored as archivd_admin_token)
-const adminApi = axios.create({ baseURL: '/api/admin' });
+const adminApi = axios.create({ baseURL: `${BASE.replace('/api', '')}/api/admin` });
 adminApi.interceptors.request.use((config) => {
   const token = localStorage.getItem('archivd_admin_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
