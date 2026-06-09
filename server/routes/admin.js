@@ -263,4 +263,50 @@ router.put('/beta-banner', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Activity backfill ───────────────────────────────────────────────────────
+// Rebuilds reading_activity from fics.last_visited + fics.word_count.
+// Groups by user_id + date, counts completed fics and sums words.
+// Safe to run multiple times — uses INSERT OR REPLACE.
+
+router.post('/backfill-activity', requireAdmin, (req, res) => {
+  const { fromDate } = req.body; // optional YYYY-MM-DD lower bound
+
+  // Fetch every fic that has a last_visited date (optionally filtered)
+  const fics = fromDate
+    ? db.prepare(`SELECT user_id, last_visited, word_count, completion_status FROM fics WHERE last_visited >= ? AND last_visited != ''`).all(fromDate)
+    : db.prepare(`SELECT user_id, last_visited, word_count, completion_status FROM fics WHERE last_visited != '' AND last_visited IS NOT NULL`).all();
+
+  if (!fics.length) return res.json({ inserted: 0, message: 'No fics with last_visited dates found.' });
+
+  // Aggregate: { "userId|date" → { fics_completed, words_read } }
+  const map = {};
+  for (const fic of fics) {
+    const date = (fic.last_visited || '').slice(0, 10); // ensure YYYY-MM-DD
+    if (!date || date.length < 10) continue;
+    const key = `${fic.user_id}|${date}`;
+    if (!map[key]) map[key] = { user_id: fic.user_id, date, fics_completed: 0, words_read: 0 };
+    if (fic.completion_status === 'complete') map[key].fics_completed += 1;
+    map[key].words_read += fic.word_count || 0;
+  }
+
+  const upsert = db.prepare(`
+    INSERT INTO reading_activity (id, user_id, date, fics_completed, words_read)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, date) DO UPDATE SET
+      fics_completed = excluded.fics_completed,
+      words_read     = excluded.words_read
+  `);
+
+  const rows = Object.values(map);
+  const insertMany = db.transaction((rows) => {
+    for (const row of rows) upsert.run(uuidv4(), row.user_id, row.date, row.fics_completed, row.words_read);
+  });
+  insertMany(rows);
+
+  res.json({
+    inserted: rows.length,
+    message: `Backfilled ${rows.length} day${rows.length !== 1 ? 's' : ''} of activity across all users.`,
+  });
+});
+
 module.exports = router;

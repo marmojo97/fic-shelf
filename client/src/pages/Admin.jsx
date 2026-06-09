@@ -11,7 +11,7 @@ import {
   adminUpdateInviteCode, adminDeleteInviteCode, adminGetFeedback,
   adminDeleteFeedback, adminGetFeedbackScreenshot, adminGetChangelog,
   adminCreateChangelogEntry, adminUpdateChangelogEntry, adminDeleteChangelogEntry,
-  adminGetBetaBanner, adminSetBetaBanner
+  adminGetBetaBanner, adminSetBetaBanner, adminBackfillActivity,
 } from '../api/index.js';
 
 const TABS = [
@@ -719,6 +719,9 @@ function SettingsTab() {
   const [bannerEnabled, setBannerEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillFrom, setBackfillFrom] = useState('2026-04-29');
+  const [backfillResult, setBackfillResult] = useState('');
 
   useEffect(() => {
     adminGetBetaBanner()
@@ -734,6 +737,20 @@ function SettingsTab() {
       setBannerEnabled(next);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function runBackfill() {
+    if (!confirm(`Backfill reading activity from ${backfillFrom} to today for all users? This will overwrite existing activity data for those dates.`)) return;
+    setBackfilling(true);
+    setBackfillResult('');
+    try {
+      const { data } = await adminBackfillActivity(backfillFrom);
+      setBackfillResult(data.message);
+    } catch (e) {
+      setBackfillResult('Error: ' + (e?.response?.data?.error || e.message));
+    } finally {
+      setBackfilling(false);
     }
   }
 
@@ -758,6 +775,37 @@ function SettingsTab() {
             }
           </button>
         </div>
+      </div>
+
+      {/* Backfill reading activity */}
+      <div className="card p-4 space-y-3">
+        <div>
+          <p className="text-txt-primary font-medium text-sm">Backfill Reading Activity</p>
+          <p className="text-txt-muted text-xs mt-0.5">
+            Rebuilds the reading activity history from imported fic visit dates. Run this once to populate historical stats.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-txt-muted text-xs whitespace-nowrap">From date</label>
+          <input
+            type="date"
+            value={backfillFrom}
+            onChange={(e) => setBackfillFrom(e.target.value)}
+            className="input-field text-sm flex-1"
+          />
+        </div>
+        <button
+          onClick={runBackfill}
+          disabled={backfilling}
+          className="btn-primary text-sm py-1.5 px-4 flex items-center gap-1.5"
+        >
+          {backfilling ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Running…</> : <><RefreshCw className="w-3.5 h-3.5" /> Run Backfill</>}
+        </button>
+        {backfillResult && (
+          <p className={`text-xs px-3 py-2 rounded-lg ${backfillResult.startsWith('Error') ? 'bg-red-400/10 text-red-400' : 'bg-accent/10 text-accent'}`}>
+            {backfillResult}
+          </p>
+        )}
       </div>
 
       <div className="card p-4 space-y-2">

@@ -128,5 +128,6 @@ export const adminUpdateChangelogEntry = (id, data) => adminApi.put(`/changelog/
 export const adminDeleteChangelogEntry = (id) => adminApi.delete(`/changelog/${id}`);
 export const adminGetBetaBanner = () => adminApi.get('/beta-banner');
 export const adminSetBetaBanner = (enabled) => adminApi.put('/beta-banner', { enabled });
+export const adminBackfillActivity = (fromDate) => adminApi.post('/backfill-activity', { fromDate });
 
 export default api;
