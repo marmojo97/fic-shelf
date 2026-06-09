@@ -3,7 +3,8 @@ import {
   Shield, Users, Ticket, MessageSquare, Sparkles, FlaskConical,
   Plus, Trash2, Eye, EyeOff, RefreshCw, LogOut, Loader2,
   Copy, Check, ToggleLeft, ToggleRight, Calendar, ChevronDown, ChevronUp,
-  Image as ImageIcon, X
+  Image as ImageIcon, X, BookOpen, Star, StickyNote, List,
+  Bookmark, Smartphone, AlertTriangle, TrendingUp, Library,
 } from 'lucide-react';
 import {
   adminLogin, adminGetStats, adminGetInviteCodes, adminCreateInviteCode,
@@ -97,40 +98,258 @@ function AdminLogin({ onLogin }) {
 function StatsTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expandedUser, setExpandedUser] = useState(null);
 
   useEffect(() => {
     adminGetStats().then(({ data }) => setData(data)).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <TabLoader />;
+  if (!data) return null;
+
+  const pct = (n, total) => total ? Math.round((n / total) * 100) : 0;
+
+  const SHELF_LABELS = {
+    read: 'Read', reading: 'Reading', 'want-to-read': 'Want to Read',
+    history: 'History', 'custom': 'Custom',
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <StatCard label="Total Users" value={data?.totalUsers ?? 0} />
-        <StatCard label="Active (7 days)" value={data?.activeUsers ?? 0} />
-      </div>
+    <div className="space-y-8">
 
-      <div>
-        <h3 className="text-txt-primary font-semibold text-sm mb-3">All Accounts</h3>
-        <div className="space-y-2">
-          {(data?.users ?? []).map(user => (
-            <div key={user.id} className="flex items-center gap-3 p-3 bg-elevated rounded-xl border border-border-subtle">
-              <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-                <span className="text-accent text-xs font-semibold uppercase">{user.username?.[0]}</span>
+      {/* ── Users ── */}
+      <section>
+        <SectionHeader icon={Users} label="Users" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <BigStat label="Total" value={data.totalUsers} />
+          <BigStat label="New this week" value={data.newThisWeek} accent />
+          <BigStat label="New this month" value={data.newThisMonth} />
+          <BigStat label="Active (7 days)" value={data.active7} accent />
+          <BigStat label="Active (30 days)" value={data.active30} />
+        </div>
+      </section>
+
+      {/* ── Library ── */}
+      <section>
+        <SectionHeader icon={Library} label="Library" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <BigStat label="Total fics" value={data.totalFics} />
+          <BigStat label="Avg fics / user" value={data.avgFics} />
+          <BigStat label="Fics rated" value={data.totalRated} />
+        </div>
+      </section>
+
+      {/* ── Shelf distribution ── */}
+      <section>
+        <SectionHeader icon={BookOpen} label="Shelf Distribution" />
+        <div className="card p-4 space-y-2.5">
+          {(data.shelfRows ?? []).map(row => (
+            <div key={row.shelf}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-txt-secondary text-xs font-medium">{SHELF_LABELS[row.shelf] || row.shelf}</span>
+                <span className="text-txt-muted text-xs">{row.count} ({pct(row.count, data.totalFics)}%)</span>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-txt-primary text-sm font-medium truncate">{user.display_name || user.username}</p>
-                <p className="text-txt-muted text-xs truncate">@{user.username} · {user.email}</p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-txt-muted text-xs">{user.fic_count} fics</p>
-                <p className="text-txt-muted text-xs">{formatDate(user.created_at)}</p>
+              <div className="h-1.5 bg-elevated rounded-full overflow-hidden">
+                <div className="h-full bg-accent rounded-full" style={{ width: `${pct(row.count, data.totalFics)}%` }} />
               </div>
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ── Completion status ── */}
+      <section>
+        <SectionHeader icon={TrendingUp} label="Completion Status" />
+        <div className="card p-4 space-y-2.5">
+          {(data.completionRows ?? []).map(row => (
+            <div key={row.completion_status}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-txt-secondary text-xs font-medium capitalize">{row.completion_status?.replace('-', ' ') || 'Unknown'}</span>
+                <span className="text-txt-muted text-xs">{row.count} ({pct(row.count, data.totalFics)}%)</span>
+              </div>
+              <div className="h-1.5 bg-elevated rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${row.completion_status === 'complete' ? 'bg-green-500' : 'bg-yellow-500'}`}
+                  style={{ width: `${pct(row.count, data.totalFics)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Top fandoms ── */}
+      <section>
+        <SectionHeader icon={Sparkles} label="Top Fandoms" />
+        <div className="card divide-y divide-border-subtle">
+          {(data.topFandoms ?? []).map((row, i) => (
+            <div key={row.fandom} className="flex items-center gap-3 px-4 py-2.5">
+              <span className="text-txt-muted text-xs w-4 text-right">{i + 1}</span>
+              <span className="text-txt-primary text-sm flex-1 truncate">{row.fandom}</span>
+              <span className="text-txt-muted text-xs">{row.count} fics</span>
+            </div>
+          ))}
+          {!data.topFandoms?.length && <p className="text-txt-muted text-sm text-center py-4">No data yet</p>}
+        </div>
+      </section>
+
+      {/* ── Feature adoption ── */}
+      <section>
+        <SectionHeader icon={Star} label="Feature Adoption" />
+        <div className="grid grid-cols-2 gap-3">
+          <AdoptionCard icon={List} label="Using Rec Lists" value={data.usersWithRecLists} total={data.totalUsers} />
+          <AdoptionCard icon={StickyNote} label="Left Notes" value={data.usersWithNotes} total={data.totalUsers} />
+          <AdoptionCard icon={Bookmark} label="Custom Shelves" value={data.usersWithCustomShelves} total={data.totalUsers} />
+          <AdoptionCard icon={Smartphone} label="Bookmarklet Set Up" value={data.usersWithBookmarklet} total={data.totalUsers} />
+        </div>
+      </section>
+
+      {/* ── Feedback ── */}
+      <section>
+        <SectionHeader icon={MessageSquare} label="Feedback" />
+        <div className="card p-4 flex items-center justify-between">
+          <span className="text-txt-secondary text-sm">Total submissions</span>
+          <span className="text-txt-primary font-bold text-lg">{data.feedbackCount}</span>
+        </div>
+      </section>
+
+      {/* ── Red flags ── */}
+      {(data.emptyAccounts > 0 || data.neverImported > 0) && (
+        <section>
+          <SectionHeader icon={AlertTriangle} label="Red Flags" color="text-yellow-400" />
+          <div className="space-y-2">
+            {data.emptyAccounts > 0 && (
+              <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-yellow-300 text-sm font-medium">Empty accounts</p>
+                  <p className="text-yellow-400/70 text-xs">Signed up but never added any fics</p>
+                </div>
+                <span className="text-yellow-300 font-bold text-lg">{data.emptyAccounts}</span>
+              </div>
+            )}
+            {data.neverImported > 0 && (
+              <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-yellow-300 text-sm font-medium">Never imported</p>
+                  <p className="text-yellow-400/70 text-xs">Have fics but added them all manually</p>
+                </div>
+                <span className="text-yellow-300 font-bold text-lg">{data.neverImported}</span>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── Per-user roster ── */}
+      <section>
+        <SectionHeader icon={Users} label="All Accounts" />
+        <div className="space-y-2">
+          {(data.users ?? []).map(user => (
+            <div key={user.id} className="card overflow-hidden">
+              <div
+                className="flex items-center gap-3 p-3 cursor-pointer hover:bg-elevated/50 transition-colors"
+                onClick={() => setExpandedUser(expandedUser === user.id ? null : user.id)}
+              >
+                <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
+                  <span className="text-accent text-xs font-semibold uppercase">{user.username?.[0]}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-txt-primary text-sm font-medium truncate">{user.display_name || user.username}</p>
+                  <p className="text-txt-muted text-xs truncate">@{user.username} · {user.email}</p>
+                </div>
+                <div className="text-right flex-shrink-0 flex items-center gap-3">
+                  <div>
+                    <p className="text-txt-primary text-sm font-semibold">{user.fic_count}</p>
+                    <p className="text-txt-muted text-xs">fics</p>
+                  </div>
+                  <div>
+                    {user.fic_count === 0
+                      ? <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-900/30 text-yellow-400">empty</span>
+                      : !user.last_import_at
+                        ? <span className="text-xs px-2 py-0.5 rounded-full bg-elevated text-txt-muted">manual only</span>
+                        : <span className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent">imported</span>
+                    }
+                  </div>
+                  {expandedUser === user.id
+                    ? <ChevronUp className="w-3.5 h-3.5 text-txt-muted" />
+                    : <ChevronDown className="w-3.5 h-3.5 text-txt-muted" />}
+                </div>
+              </div>
+
+              {expandedUser === user.id && (
+                <div className="border-t border-border-subtle px-4 py-3 bg-elevated/30 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <UserStat label="Joined" value={formatDate(user.created_at)} />
+                  <UserStat label="Last import" value={user.last_import_at ? formatDate(user.last_import_at) : 'Never'} />
+                  <UserStat label="Fics rated" value={user.rated_count ?? 0} />
+                  <UserStat label="Notes written" value={user.notes_count ?? 0} />
+                  <UserStat label="Rec lists" value={user.reclist_count ?? 0} />
+                  <UserStat label="Custom shelves" value={user.custom_shelf_count ?? 0} />
+                  <div className="col-span-2 sm:col-span-3">
+                    <p className="text-txt-muted mb-1 font-medium">Shelves</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        ['Read', user.shelf_read],
+                        ['Reading', user.shelf_reading],
+                        ['Want to Read', user.shelf_wtr],
+                        ['History', user.shelf_history],
+                      ].map(([label, count]) => count > 0 && (
+                        <span key={label} className="bg-elevated border border-border-subtle px-2 py-0.5 rounded-lg text-txt-secondary">
+                          {label}: {count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+    </div>
+  );
+}
+
+function SectionHeader({ icon: Icon, label, color = 'text-accent' }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <Icon className={`w-4 h-4 ${color}`} />
+      <h3 className="text-txt-primary font-semibold text-sm">{label}</h3>
+    </div>
+  );
+}
+
+function BigStat({ label, value, accent }) {
+  return (
+    <div className="card p-4 text-center">
+      <p className={`text-3xl font-bold ${accent ? 'text-accent' : 'text-txt-primary'}`}>{value ?? 0}</p>
+      <p className="text-txt-muted text-xs mt-1">{label}</p>
+    </div>
+  );
+}
+
+function AdoptionCard({ icon: Icon, label, value, total }) {
+  const pct = total ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="card p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-3.5 h-3.5 text-accent" />
+        <span className="text-txt-muted text-xs">{label}</span>
       </div>
+      <p className="text-txt-primary text-xl font-bold">{value ?? 0}</p>
+      <div className="mt-1.5 h-1 bg-elevated rounded-full overflow-hidden">
+        <div className="h-full bg-accent rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="text-txt-muted text-xs mt-1">{pct}% of users</p>
+    </div>
+  );
+}
+
+function UserStat({ label, value }) {
+  return (
+    <div>
+      <p className="text-txt-muted">{label}</p>
+      <p className="text-txt-secondary font-medium mt-0.5">{value}</p>
     </div>
   );
 }

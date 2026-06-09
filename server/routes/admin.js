@@ -41,26 +41,76 @@ router.post('/auth', (req, res) => {
 // ─── Stats ───────────────────────────────────────────────────────────────────
 
 router.get('/stats', requireAdmin, (req, res) => {
-  const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+  // ── User counts ──────────────────────────────────────────────────────────
+  const totalUsers    = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
+  const newThisWeek   = db.prepare("SELECT COUNT(*) as c FROM users WHERE created_at > datetime('now', '-7 days')").get().c;
+  const newThisMonth  = db.prepare("SELECT COUNT(*) as c FROM users WHERE created_at > datetime('now', '-30 days')").get().c;
+  const active7       = db.prepare(`SELECT COUNT(DISTINCT user_id) as c FROM fics WHERE updated_at > datetime('now', '-7 days')`).get().c;
+  const active30      = db.prepare(`SELECT COUNT(DISTINCT user_id) as c FROM fics WHERE updated_at > datetime('now', '-30 days')`).get().c;
 
-  // Active = has updated any fic in the last 7 days OR has logged in (we track nothing for logins,
-  // so fall back to: registered in last 7 days OR has fics updated in last 7 days)
-  const activeUsers = db.prepare(`
-    SELECT COUNT(DISTINCT id) as count FROM users
-    WHERE id IN (
-      SELECT DISTINCT user_id FROM fics
-      WHERE updated_at > datetime('now', '-7 days')
-    ) OR created_at > datetime('now', '-7 days')
-  `).get().count;
+  // ── Library totals ───────────────────────────────────────────────────────
+  const totalFics     = db.prepare('SELECT COUNT(*) as c FROM fics').get().c;
+  const avgFicsRaw    = db.prepare('SELECT AVG(cnt) as a FROM (SELECT COUNT(*) as cnt FROM fics GROUP BY user_id)').get().a;
+  const avgFics       = avgFicsRaw ? Math.round(avgFicsRaw * 10) / 10 : 0;
+  const totalRated    = db.prepare('SELECT COUNT(*) as c FROM fics WHERE personal_rating > 0').get().c;
 
+  // ── Shelf distribution ───────────────────────────────────────────────────
+  const shelfRows     = db.prepare('SELECT shelf, COUNT(*) as count FROM fics GROUP BY shelf ORDER BY count DESC').all();
+
+  // ── Completion status ────────────────────────────────────────────────────
+  const completionRows = db.prepare("SELECT completion_status, COUNT(*) as count FROM fics GROUP BY completion_status ORDER BY count DESC").all();
+
+  // ── Top fandoms ──────────────────────────────────────────────────────────
+  const topFandoms    = db.prepare("SELECT fandom, COUNT(*) as count FROM fics WHERE fandom != '' GROUP BY fandom ORDER BY count DESC LIMIT 10").all();
+
+  // ── Feature adoption ─────────────────────────────────────────────────────
+  const usersWithRecLists     = db.prepare('SELECT COUNT(DISTINCT user_id) as c FROM rec_lists').get().c;
+  const usersWithNotes        = db.prepare("SELECT COUNT(DISTINCT user_id) as c FROM fics WHERE personal_notes != '' AND personal_notes IS NOT NULL").get().c;
+  const usersWithCustomShelves = db.prepare('SELECT COUNT(DISTINCT user_id) as c FROM custom_shelves').get().c;
+  const usersWithBookmarklet  = db.prepare('SELECT COUNT(*) as c FROM users WHERE api_token IS NOT NULL').get().c;
+
+  // ── Feedback ─────────────────────────────────────────────────────────────
+  const feedbackCount = db.prepare('SELECT COUNT(*) as c FROM feedback').get().c;
+
+  // ── Red flags ────────────────────────────────────────────────────────────
+  const emptyAccounts    = db.prepare('SELECT COUNT(*) as c FROM users WHERE id NOT IN (SELECT DISTINCT user_id FROM fics)').get().c;
+  const neverImported    = db.prepare('SELECT COUNT(*) as c FROM users WHERE last_import_at IS NULL AND id IN (SELECT DISTINCT user_id FROM fics)').get().c;
+
+  // ── Per-user detail ──────────────────────────────────────────────────────
   const users = db.prepare(`
-    SELECT u.id, u.email, u.username, u.display_name, u.created_at,
-           (SELECT COUNT(*) FROM fics WHERE user_id = u.id) as fic_count
+    SELECT
+      u.id, u.email, u.username, u.display_name, u.created_at, u.last_import_at,
+      COUNT(f.id)                                                              AS fic_count,
+      SUM(CASE WHEN f.personal_rating > 0 THEN 1 ELSE 0 END)                 AS rated_count,
+      SUM(CASE WHEN f.personal_notes != '' AND f.personal_notes IS NOT NULL THEN 1 ELSE 0 END) AS notes_count,
+      SUM(CASE WHEN f.shelf = 'read'          THEN 1 ELSE 0 END)             AS shelf_read,
+      SUM(CASE WHEN f.shelf = 'reading'       THEN 1 ELSE 0 END)             AS shelf_reading,
+      SUM(CASE WHEN f.shelf = 'want-to-read'  THEN 1 ELSE 0 END)             AS shelf_wtr,
+      SUM(CASE WHEN f.shelf = 'history'       THEN 1 ELSE 0 END)             AS shelf_history,
+      (SELECT COUNT(*) FROM rec_lists    WHERE user_id = u.id)                AS reclist_count,
+      (SELECT COUNT(*) FROM custom_shelves WHERE user_id = u.id)              AS custom_shelf_count
     FROM users u
+    LEFT JOIN fics f ON f.user_id = u.id
+    GROUP BY u.id
     ORDER BY u.created_at DESC
   `).all();
 
-  res.json({ totalUsers, activeUsers, users });
+  res.json({
+    // User counts
+    totalUsers, newThisWeek, newThisMonth, active7, active30,
+    // Library
+    totalFics, avgFics, totalRated,
+    // Breakdowns
+    shelfRows, completionRows, topFandoms,
+    // Feature adoption
+    usersWithRecLists, usersWithNotes, usersWithCustomShelves, usersWithBookmarklet,
+    // Feedback
+    feedbackCount,
+    // Red flags
+    emptyAccounts, neverImported,
+    // Per user
+    users,
+  });
 });
 
 // ─── Invite Codes ─────────────────────────────────────────────────────────────
