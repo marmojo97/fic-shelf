@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus, Grid, List, Search, X, Download, Loader2,
   CheckSquare, Square, ChevronDown, Trash2, SlidersHorizontal, Check,
@@ -19,6 +20,7 @@ const SHELF_TABS = [
   { value: 'all',          label: 'All' },
   { value: 'reading',      label: 'Reading' },
   { value: 'want-to-read', label: 'Want to Read' },
+  { value: 'maybe',        label: 'Maybe' },
   { value: 're-reading',   label: 'Re-reading' },
   { value: 'read',         label: 'Read' },
   { value: 'history',      label: 'History' },
@@ -39,6 +41,7 @@ const STATIC_BULK_SHELVES = [
   { value: 'read',         label: 'Read' },
   { value: 'reading',      label: 'Currently Reading' },
   { value: 'want-to-read', label: 'Want to Read' },
+  { value: 'maybe',        label: 'Maybe' },
   { value: 're-reading',   label: 'Re-reading' },
   { value: 'history',      label: 'History' },
   { value: 'dnf',          label: 'DNF' },
@@ -68,6 +71,7 @@ function EmptyState({ shelf, onAdd }) {
     all:            { title: 'Your shelf is empty',      body: 'Start by adding your first fic.' },
     reading:        { title: 'Nothing in progress',      body: 'Got a WIP open in another tab? Add it here.' },
     'want-to-read': { title: 'Your reading list awaits', body: 'Paste an AO3 link and let it live here.' },
+    maybe:          { title: 'Your Maybe pile is empty', body: 'Use the "Save to Maybe" bookmarklet on AO3 to stash fics you might want to read.' },
     read:           { title: 'No finished fics yet',     body: 'When you wrap something up, mark it read.' },
     dnf:            { title: 'Nothing here (good!)',     body: "Some fics just aren't the right fit." },
     're-reading':   { title: 'No re-reads tracked',      body: 'Revisiting a comfort fic? Let Archivd know.' },
@@ -290,11 +294,29 @@ function Pagination({ page, totalPages, onChange }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function MyShelf() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Core state
   const [fics, setFics] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [activeShelf, setActiveShelf] = useState('all');
+
+  // Shelf is driven by URL param so bookmarklet links like ?shelf=maybe work
+  const VALID_SHELVES = new Set(['all','reading','want-to-read','maybe','re-reading','read','history','dnf']);
+  const urlShelf = searchParams.get('shelf');
+  const [activeShelf, setActiveShelf] = useState(
+    urlShelf && VALID_SHELVES.has(urlShelf) ? urlShelf : 'all'
+  );
+
+  // Keep URL in sync when shelf changes
+  function handleSetShelf(shelf) {
+    setActiveShelf(shelf);
+    if (shelf === 'all') {
+      setSearchParams({}, { replace: true });
+    } else {
+      setSearchParams({ shelf }, { replace: true });
+    }
+  }
   const [view, setView] = useState('grid');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('added_at');
@@ -626,7 +648,7 @@ export default function MyShelf() {
           {SHELF_TABS.map(tab => (
             <button
               key={tab.value}
-              onClick={() => setActiveShelf(tab.value)}
+              onClick={() => handleSetShelf(tab.value)}
               className={`flex items-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap border-b-2 transition-colors ${
                 activeShelf === tab.value
                   ? 'border-accent text-accent font-medium'
