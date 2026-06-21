@@ -324,6 +324,126 @@ function getFandomColor(fandom) {
   return colors[Math.abs(hash) % colors.length];
 }
 
+// POST /api/fics/recommend — mood-based recommendation from Maybe / Want-to-Read
+router.post('/recommend', (req, res) => {
+  const userId = req.userId;
+  const { query = '' } = req.body;
+  if (!query.trim()) return res.status(400).json({ error: 'query is required' });
+
+  const lower = query.toLowerCase();
+
+  // ── Parse rating ──────────────────────────────────────────────────────────
+  let rating = null;
+  if (/\b(explicit|smut|nsfw)\b/.test(lower)) rating = 'E';
+  else if (/\bmature\b/.test(lower)) rating = 'M';
+  else if (/\b(teen|teen and up)\b/.test(lower)) rating = 'T';
+  else if (/\b(general|clean|sfw)\b/.test(lower)) rating = 'G';
+
+  // ── Parse word count ──────────────────────────────────────────────────────
+  let maxWords = null, minWords = null;
+  const underM  = lower.match(/(?:under|less\s+than)\s+(\d+)\s*k/);
+  const overM   = lower.match(/(?:over|more\s+than|at\s+least)\s+(\d+)\s*k/);
+  const standaloneK = lower.match(/\b(\d+)\s*k\b/);
+  if (underM)       maxWords = parseInt(underM[1]) * 1000;
+  if (overM)        minWords = parseInt(overM[1]) * 1000;
+  if (!underM && !overM && standaloneK) maxWords = parseInt(standaloneK[1]) * 1000;
+  if (/\bshort\b/.test(lower) && !maxWords)  maxWords = 15000;
+  if (/\blong\b/.test(lower)  && !minWords)  minWords = 50000;
+  if (/\bepic\b/.test(lower)  && !minWords)  minWords = 100000;
+
+  // ── Parse completion ──────────────────────────────────────────────────────
+  let completion = null;
+  if (/\b(complete[d]?|finished|done)\b/.test(lower))       completion = 'complete';
+  else if (/\b(wip|in.progress|ongoing|unfinished)\b/.test(lower)) completion = 'in-progress';
+
+  // ── Extract tag search terms ──────────────────────────────────────────────
+  const stopWords = new Set([
+    'explicit','mature','teen','general','smut','nsfw','sfw','clean','short','long','epic',
+    'complete','completed','finished','done','wip','ongoing','unfinished','in','progress',
+    'under','over','less','than','more','least','and','the','a','an','or','for','with',
+    'at','to','of','in','about','around','some','want','read','fic','fanfic','something',
+    'give','me','show','find','looking','mood','craving',
+  ]);
+  const tagTerms = lower
+    .replace(/(?:under|less\s+than|over|more\s+than|at\s+least)\s+\d+\s*k/g, '')
+    .replace(/\b\d+\s*k\b/g, '')
+    .split(/[\s,;/]+/)
+    .map(t => t.replace(/[^a-z0-9'-]/g, ''))
+    .filter(t => t.length > 2 && !stopWords.has(t));
+
+  // ── Query fics ────────────────────────────────────────────────────────────
+  const allFics = db.prepare(`
+    SELECT id, title, author, fandom, word_count, completion_status, content_rating,
+           tags, ships, characters, personal_rating, shelf, cover_color, source_url,
+           description, chapter_count, chapters_read
+    FROM fics
+    WHERE user_id = ? AND shelf IN ('maybe', 'want-to-read')
+  `).all(userId);
+
+  // ── Score each fic ────────────────────────────────────────────────────────
+  function scoreFic(fic) {
+    let score = 0;
+    let matched = [];
+    if (rating && fic.content_rating === rating) { score += 3; matched.push(`Rating: ${rating}`); }
+    if (maxWords && fic.word_count <= maxWords)    { score += 2; matched.push(`Under ${maxWords/1000}k words`); }
+    if (minWords && fic.word_count >= minWords)    { score += 2; matched.push(`Over ${minWords/1000}k words`); }
+    if (completion && fic.completion_status === completion) { score += 2; matched.push(completion === 'complete' ? 'Complete' : 'WIP'); }
+
+    const haystack = [
+      fic.fandom || '', fic.ships || '', fic.characters || '', fic.tags || '', fic.title || '',
+    ].join(' ').toLowerCase();
+
+    for (const term of tagTerms) {
+      if (haystack.includes(term)) { score += 1; matched.push(term); }
+    }
+    return { score, matched };
+  }
+
+  const maybe   = allFics.filter(f => f.shelf === 'maybe');
+  const wtr     = allFics.filter(f => f.shelf === 'want-to-read');
+
+  const hasFilters = rating || maxWords || minWords || completion || tagTerms.length > 0;
+
+  function rankAndLimit(fics, limit) {
+    const scored = fics.map(f => {
+      const { score, matched } = scoreFic(f);
+      return { ...f, _score: score, _matched: matched };
+    });
+    if (hasFilters) {
+      return scored.filter(f => f._score > 0).sort((a, b) => b._score - a._score).slice(0, limit);
+    }
+    // No filters: shuffle and return random picks
+    return scored.sort(() => Math.random() - 0.5).slice(0, limit);
+  }
+
+  let results = rankAndLimit(maybe, 5);
+  let source = 'maybe';
+
+  if (results.length < 3) {
+    // Pad or replace with want-to-read
+    const wtrPicks = rankAndLimit(wtr, 5 - results.length);
+    if (results.length === 0) {
+      results = wtrPicks;
+      source = 'want-to-read';
+    } else {
+      results = [...results, ...wtrPicks.map(f => ({ ...f, _fromWtr: true }))];
+      source = 'mixed';
+    }
+  }
+
+  res.json({
+    results: results.map(({ _score, _matched, _fromWtr, ...f }) => ({
+      ...f,
+      _matchedCriteria: _matched || [],
+      _fromWtr: !!_fromWtr,
+    })),
+    parsed: { rating, maxWords, minWords, completion, tagTerms },
+    source,
+    totalMaybe: maybe.length,
+    totalWtr: wtr.length,
+  });
+});
+
 // POST /api/fics/quick-add — bookmarklet endpoint: accepts scraped AO3 page data
 const RATING_MAP_QA = {
   'General Audiences': 'G', 'Teen And Up Audiences': 'T',
@@ -339,8 +459,10 @@ router.post('/quick-add', (req, res) => {
   const {
     title, author, fandom, fandoms, rating, warnings, relationships,
     characters, freeforms, words, chapters, completion, summary,
-    sourceUrl, lastVisited,
+    sourceUrl, lastVisited, shelf: requestedShelf,
   } = req.body;
+  const VALID_SHELVES = ['history', 'reading', 'read', 'want-to-read', 'maybe'];
+  const shelf = VALID_SHELVES.includes(requestedShelf) ? requestedShelf : 'history';
 
   if (!title) return res.status(400).json({ error: 'title is required' });
 
@@ -380,12 +502,13 @@ router.post('/quick-add', (req, res) => {
     JSON.stringify(parseList(warnings).filter(w => w !== 'No Archive Warnings Apply' && w !== 'Creator Chose Not To Use Archive Warnings')),
     JSON.stringify(parseList(freeforms)),
     'English', '', sourceUrl || '', 'ao3',
-    '', 'history', 0,
+    '', shelf, 0,
     getFandomColor(primaryFandom),
     summary || '', lastVisited || '', 1
   );
 
-  res.json({ id, message: 'Added to History shelf' });
+  const shelfLabel = { history: 'History', reading: 'Reading', read: 'Read', 'want-to-read': 'Want to Read', maybe: 'Maybe' }[shelf] || shelf;
+  res.json({ id, message: `Added to ${shelfLabel} shelf` });
 });
 
 module.exports = router;

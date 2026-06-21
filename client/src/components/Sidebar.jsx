@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Compass, BarChart2, List, User, LogOut, Bookmark, Upload, Sparkles, Settings } from 'lucide-react';
+import { BookOpen, BarChart2, List, User, LogOut, Bookmark, Upload, Sparkles, Settings, Wand2, CircleDashed } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import ImportModal from './ImportModal.jsx';
@@ -8,7 +8,8 @@ import { getChangelogUnread } from '../api/index.js';
 
 const NAV_ITEMS = [
   { to: '/shelf', icon: BookOpen, label: 'My Shelves' },
-  { to: '/discover', icon: Compass, label: 'Discover' },
+  { to: '/shelf?shelf=maybe', icon: CircleDashed, label: 'Maybe', exact: false },
+  { to: '/for-you', icon: Wand2, label: 'For You' },
   { to: '/stats', icon: BarChart2, label: 'Stats' },
   { to: '/reclists', icon: List, label: 'Rec Lists' },
   { to: '/profile', icon: User, label: 'Profile' },

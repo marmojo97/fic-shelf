@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import MyShelf from './pages/MyShelf.jsx';
-import Discover from './pages/Discover.jsx';
+import ForYou from './pages/ForYou.jsx';
 import Stats from './pages/Stats.jsx';
 import RecLists from './pages/RecLists.jsx';
 import Profile from './pages/Profile.jsx';
@@ -45,7 +45,8 @@ function AppRoutes() {
               <Routes>
                 <Route path="/" element={<Navigate to="/shelf" replace />} />
                 <Route path="/shelf" element={<MyShelf />} />
-                <Route path="/discover" element={<Discover />} />
+                <Route path="/for-you" element={<ForYou />} />
+                <Route path="/discover" element={<Navigate to="/for-you" replace />} />
                 <Route path="/stats" element={<Stats />} />
                 <Route path="/reclists" element={<RecLists />} />
                 <Route path="/profile" element={<Profile />} />

@@ -106,6 +106,9 @@ export const dismissBetaBanner = () => api.post('/beta-banner/dismiss');
 export const getApiToken = () => api.get('/settings/token');
 export const regenerateApiToken = () => api.post('/settings/token/regenerate');
 
+// Mood-based recommendations (searches Maybe then Want-to-Read)
+export const getMoodRecommendations = (query) => api.post('/fics/recommend', { query });
+
 // Admin (uses a separate token stored as archivd_admin_token)
 const adminApi = axios.create({ baseURL: `${BASE.replace('/api', '')}/api/admin` });
 adminApi.interceptors.request.use((config) => {

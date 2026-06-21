@@ -1,10 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { BookOpen, Compass, BarChart2, List, Settings } from 'lucide-react';
+import { BookOpen, Wand2, BarChart2, List, Settings } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/shelf', icon: BookOpen, label: 'Shelf' },
-  { to: '/discover', icon: Compass, label: 'Discover' },
+  { to: '/for-you', icon: Wand2, label: 'For You' },
   { to: '/stats', icon: BarChart2, label: 'Stats' },
   { to: '/reclists', icon: List, label: 'Recs' },
   { to: '/settings', icon: Settings, label: 'Settings' },
