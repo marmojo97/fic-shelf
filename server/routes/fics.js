@@ -372,10 +372,9 @@ router.post('/recommend', (req, res) => {
     .filter(t => t.length > 2 && !stopWords.has(t));
 
   // ── Query fics ────────────────────────────────────────────────────────────
+  // Select all columns so parseFic() can produce the full camelCase shape FicDrawer expects
   const allFics = db.prepare(`
-    SELECT id, title, author, fandom, word_count, completion_status, content_rating,
-           tags, ships, characters, personal_rating, shelf, cover_color, source_url,
-           description, chapter_count, chapters_read
+    SELECT *
     FROM fics
     WHERE user_id = ? AND shelf IN ('maybe', 'want-to-read')
   `).all(userId);
@@ -433,7 +432,7 @@ router.post('/recommend', (req, res) => {
 
   res.json({
     results: results.map(({ _score, _matched, _fromWtr, ...f }) => ({
-      ...f,
+      ...parseFic(f),
       _matchedCriteria: _matched || [],
       _fromWtr: !!_fromWtr,
     })),

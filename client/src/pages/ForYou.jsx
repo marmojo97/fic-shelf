@@ -13,9 +13,9 @@ const EXAMPLES = [
 ];
 
 function FicResult({ fic, onOpen, fromWtr }) {
-  const wordK = fic.word_count ? (fic.word_count >= 1000 ? `${Math.round(fic.word_count / 1000)}k` : fic.word_count) : null;
-  const isComplete = fic.completion_status === 'complete';
-  const ratingColor = { E: 'text-red-400', M: 'text-orange-400', T: 'text-yellow-400', G: 'text-green-400' }[fic.content_rating] || 'text-txt-muted';
+  const wordK = fic.wordCount ? (fic.wordCount >= 1000 ? `${Math.round(fic.wordCount / 1000)}k` : fic.wordCount) : null;
+  const isComplete = fic.completionStatus === 'complete';
+  const ratingColor = { E: 'text-red-400', M: 'text-orange-400', T: 'text-yellow-400', G: 'text-green-400' }[fic.contentRating] || 'text-txt-muted';
 
   return (
     <div
@@ -26,7 +26,7 @@ function FicResult({ fic, onOpen, fromWtr }) {
         {/* Color swatch */}
         <div
           className="w-10 h-14 rounded-lg flex-shrink-0 flex items-end justify-center pb-1"
-          style={{ backgroundColor: fic.cover_color || '#1a2e2e' }}
+          style={{ backgroundColor: fic.coverColor || '#1a2e2e' }}
         >
           <BookOpen className="w-4 h-4 text-white/60" />
         </div>
@@ -47,8 +47,8 @@ function FicResult({ fic, onOpen, fromWtr }) {
           )}
 
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            {fic.content_rating && (
-              <span className={`text-xs font-semibold ${ratingColor}`}>{fic.content_rating}</span>
+            {fic.contentRating && (
+              <span className={`text-xs font-semibold ${ratingColor}`}>{fic.contentRating}</span>
             )}
             {wordK && <span className="text-xs text-txt-muted">{wordK} words</span>}
             <span className={`text-xs ${isComplete ? 'text-green-400' : 'text-yellow-400'}`}>
