@@ -100,7 +100,8 @@ function mapAo3Row(row) {
   const fandom = fandomsRaw.split(/\s*[;,]\s*/).map(s => s.trim()).filter(Boolean)[0] || '';
 
   // History-specific fields
-  const lastVisited  = get('Last Visited', 'LastVisited', 'Date Visited', 'Date Read') || '';
+  // 'Date' is the primary AO3 history export column for the visit date
+  const lastVisited  = get('Date', 'Last Visited', 'LastVisited', 'Date Visited', 'Date Read') || '';
   const totalVisits  = parseInt(get('Total Visits', 'TotalVisits', 'Visits') || '1') || 1;
 
   // Description/summary — from the updated scraper's "Summary" column
@@ -250,14 +251,20 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
 
     // New fic — insert it
     const id = uuidv4();
+    // date_finished = lastVisited (the AO3 "Date" column) so historical stats
+    // reflect actual read dates rather than the import date.
+    // Falls back to empty string if the CSV had no date — these fics will be
+    // attributed to added_at in stats queries (import date) until re-imported.
+    const dateFinished = fic.lastVisited || '';
+
     db.prepare(`
       INSERT INTO fics (
         id, user_id, title, author, fandom, ships, characters, word_count,
         chapter_count, chapters_read, completion_status, content_rating,
         content_warnings, tags, language, series_name, source_url, source_platform,
         last_updated_date, shelf, personal_rating, cover_color,
-        description, last_visited, total_visits
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        description, last_visited, total_visits, date_finished
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, userId, fic.title, fic.author || '', fic.fandom || '',
       JSON.stringify(fic.ships || []), JSON.stringify(fic.characters || []),
@@ -267,7 +274,8 @@ router.post('/ao3-csv/confirm', upload.single('file'), (req, res) => {
       fic.language || 'English', fic.seriesName || '', fic.sourceUrl || '', 'ao3',
       fic.lastUpdatedDate || '', defaultShelf, 0,
       getFandomColor(fic.fandom || ''),
-      fic.description || '', fic.lastVisited || '', fic.totalVisits || 0
+      fic.description || '', fic.lastVisited || '', fic.totalVisits || 0,
+      dateFinished
     );
 
     importedFics.push({
