@@ -1045,7 +1045,7 @@ export default function MyShelf() {
         ) : view === 'grid' ? (
           <div className="px-6 py-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
             {paginatedFics.map(fic => (
-              <FicCard key={fic.id} fic={fic} onClick={setSelectedFic} />
+              <FicCard key={fic.id} fic={fic} onClick={setSelectedFic} onUpdate={handleFicUpdated} />
             ))}
             {page === totalPages && (
               <button
