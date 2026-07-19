@@ -156,7 +156,7 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
           </button>
 
           {/* Fandom + Title + Author stacked at bottom of band */}
-          <div className="absolute bottom-3 left-5 right-12 z-10">
+          <div className="absolute bottom-3 left-12 right-12 z-10">
             <p className="text-white/70 text-[11px] mb-1 truncate">{fic.fandom}</p>
             <h2
               className="text-white leading-tight truncate"
