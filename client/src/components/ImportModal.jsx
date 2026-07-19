@@ -1,8 +1,28 @@
 import React, { useState, useRef, useMemo } from 'react';
 import {
   X, Upload, FileText, CheckCircle2, AlertCircle, Loader2,
-  BookOpen, ChevronDown, Calendar, Filter, CheckSquare, Square,
+  BookOpen, ChevronDown, Calendar, Filter, CheckSquare, Square, Info,
 } from 'lucide-react';
+
+const LAST_IMPORT_KEY = 'archivd_last_import_date';
+
+function getLastImportDate() {
+  try {
+    const raw = localStorage.getItem(LAST_IMPORT_KEY);
+    if (!raw) return null;
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? null : d;
+  } catch { return null; }
+}
+
+function saveLastImportDate() {
+  try { localStorage.setItem(LAST_IMPORT_KEY, new Date().toISOString()); } catch {}
+}
+
+function formatLastImport(d) {
+  if (!d) return null;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 import { previewAo3Csv, confirmAo3Csv, bulkSortFics } from '../api/index.js';
 
 const RATING_BADGE = {
@@ -124,9 +144,17 @@ export default function ImportModal({ onClose, onImported }) {
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef(null);
 
+  // Last import date — read once on mount
+  const lastImport = useMemo(() => getLastImportDate(), []);
+  const lastImportLabel = formatLastImport(lastImport);
+
   // Import mode: 'all' = everything (dupes skipped) | 'range' = filter by last visited date
   const [importMode, setImportMode] = useState('all');
-  const [rangeFrom, setRangeFrom] = useState(''); // YYYY-MM
+  // Pre-fill rangeFrom with the month of the last import if one exists
+  const defaultRangeFrom = lastImport
+    ? `${lastImport.getFullYear()}-${String(lastImport.getMonth() + 1).padStart(2, '0')}`
+    : '';
+  const [rangeFrom, setRangeFrom] = useState(defaultRangeFrom); // YYYY-MM
   const [rangeTo, setRangeTo]     = useState(''); // YYYY-MM
 
   // Bulk sort state
@@ -170,6 +198,7 @@ export default function ImportModal({ onClose, onImported }) {
         ? (() => { const [y, m] = rangeTo.split('-').map(Number); return new Date(y, m, 0).toISOString().slice(0, 10); })()
         : '';
       const { data } = await confirmAo3Csv(file, 'history', fromDate, toDate);
+      saveLastImportDate();
       setResult(data);
       setSelected(new Set());
       setAssignments({});
@@ -341,7 +370,15 @@ export default function ImportModal({ onClose, onImported }) {
 
               {/* Import mode picker */}
               <div className="space-y-2">
-                <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">What would you like to import?</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">What would you like to import?</p>
+                  {lastImportLabel && (
+                    <span className="flex items-center gap-1 text-[11px] text-txt-muted bg-elevated px-2 py-1 rounded-lg flex-shrink-0 border border-border-subtle">
+                      <Calendar className="w-3 h-3 flex-shrink-0" />
+                      Last import: <span className="text-txt-secondary font-medium">{lastImportLabel}</span>
+                    </span>
+                  )}
+                </div>
 
                 {/* Option A: all fics */}
                 <button
@@ -384,7 +421,11 @@ export default function ImportModal({ onClose, onImported }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-txt-primary">Select a date range</p>
-                      <p className="text-xs text-txt-muted mt-0.5">Only import fics visited within a specific time period</p>
+                      <p className="text-xs text-txt-muted mt-0.5">
+                        {lastImportLabel
+                          ? `Only pull what's new since your last import (${lastImportLabel})`
+                          : 'Only import fics visited within a specific time period'}
+                      </p>
                     </div>
                   </div>
 
