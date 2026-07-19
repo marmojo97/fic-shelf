@@ -48,6 +48,8 @@ function parseFic(fic) {
     description:      fic.description || '',
     lastVisited:      fic.last_visited || '',
     totalVisits:      fic.total_visits || 0,
+    // V5 columns
+    isFavorite:       Boolean(fic.is_favorite),
   };
 }
 
@@ -123,7 +125,9 @@ router.get('/', (req, res) => {
   let where = ['user_id = ?'];
   let params = [req.userId];
 
-  if (shelf && shelf !== 'all') {
+  if (shelf === 'faves') {
+    where.push('is_favorite = 1');
+  } else if (shelf && shelf !== 'all') {
     where.push('shelf = ?');
     params.push(shelf);
   }
@@ -239,13 +243,14 @@ router.put('/:id', (req, res) => {
     sourcePlatform: 'source_platform', lastUpdatedDate: 'last_updated_date',
     customShelf: 'custom_shelf', personalRating: 'personal_rating', personalNotes: 'personal_notes',
     dateStarted: 'date_started', dateFinished: 'date_finished', rereadCount: 'reread_count',
-    emotionalDamage: 'emotional_damage', coverColor: 'cover_color'
+    emotionalDamage: 'emotional_damage', coverColor: 'cover_color',
+    isFavorite: 'is_favorite'
   };
 
   for (const [camel, snake] of Object.entries(mapping)) {
     if (body[camel] !== undefined) {
       updates.push(`${snake} = ?`);
-      if (snake === 'emotional_damage') values.push(body[camel] ? 1 : 0);
+      if (snake === 'emotional_damage' || snake === 'is_favorite') values.push(body[camel] ? 1 : 0);
       else if (jsonFields[snake]) values.push(JSON.stringify(body[camel]));
       else values.push(body[camel]);
     }
@@ -458,10 +463,12 @@ router.post('/quick-add', (req, res) => {
   const {
     title, author, fandom, fandoms, rating, warnings, relationships,
     characters, freeforms, words, chapters, completion, summary,
-    sourceUrl, lastVisited, shelf: requestedShelf,
+    sourceUrl, lastVisited, shelf: requestedShelf, dateFinished: reqDateFinished,
   } = req.body;
   const VALID_SHELVES = ['history', 'reading', 'read', 'want-to-read', 'maybe'];
-  const shelf = VALID_SHELVES.includes(requestedShelf) ? requestedShelf : 'history';
+  const shelf = VALID_SHELVES.includes(requestedShelf) ? requestedShelf : 'read';
+  const today = new Date().toISOString().slice(0, 10);
+  const dateFinished = shelf === 'read' ? (reqDateFinished || today) : '';
 
   if (!title) return res.status(400).json({ error: 'title is required' });
 
@@ -489,8 +496,8 @@ router.post('/quick-add', (req, res) => {
       chapter_count, chapters_read, completion_status, content_rating,
       content_warnings, tags, language, series_name, source_url, source_platform,
       last_updated_date, shelf, personal_rating, cover_color,
-      description, last_visited, total_visits
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      description, last_visited, total_visits, date_finished
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, userId, title, author || '', primaryFandom,
     JSON.stringify(parseList(relationships)), JSON.stringify(parseList(characters)),
@@ -503,7 +510,7 @@ router.post('/quick-add', (req, res) => {
     'English', '', sourceUrl || '', 'ao3',
     '', shelf, 0,
     getFandomColor(primaryFandom),
-    summary || '', lastVisited || '', 1
+    summary || '', lastVisited || '', 1, dateFinished
   );
 
   const shelfLabel = { history: 'History', reading: 'Reading', read: 'Read', 'want-to-read': 'Want to Read', maybe: 'Maybe' }[shelf] || shelf;

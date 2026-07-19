@@ -18,6 +18,7 @@ import {
 
 const SHELF_TABS = [
   { value: 'all',          label: 'All' },
+  { value: 'faves',        label: '♥ Faves' },
   { value: 'reading',      label: 'Reading' },
   { value: 'want-to-read', label: 'Want to Read' },
   { value: 'maybe',        label: 'Maybe' },
@@ -66,11 +67,67 @@ const PAGE_SIZE = 30;
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+function FaveCard({ fic, onClick }) {
+  const wordK = fic.wordCount ? (fic.wordCount >= 1000 ? `${Math.round(fic.wordCount / 1000)}k` : fic.wordCount) : null;
+  const stars = fic.personalRating ? '★'.repeat(Math.round(fic.personalRating)) : null;
+
+  return (
+    <div
+      className="bg-surface border border-border rounded-2xl overflow-hidden hover:border-accent/40 transition-all cursor-pointer group flex flex-col"
+      onClick={() => onClick(fic)}
+    >
+      {/* Color band */}
+      <div
+        className="h-2 flex-shrink-0"
+        style={{ backgroundColor: fic.coverColor || '#1a2e2e' }}
+      />
+
+      <div className="p-4 flex flex-col gap-2.5 flex-1">
+        {/* Title + author */}
+        <div>
+          <h3 className="text-txt-primary font-semibold text-sm leading-snug group-hover:text-accent transition-colors line-clamp-2">
+            {fic.title}
+          </h3>
+          <p className="text-txt-muted text-xs mt-0.5">by {fic.author}</p>
+        </div>
+
+        {/* Meta row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {fic.contentRating && (
+            <span className={`text-xs font-semibold ${{ E: 'text-red-400', M: 'text-orange-400', T: 'text-yellow-400', G: 'text-green-400' }[fic.contentRating] || 'text-txt-muted'}`}>
+              {fic.contentRating}
+            </span>
+          )}
+          {wordK && <span className="text-txt-muted text-xs">{wordK} words</span>}
+          {stars && <span className="text-accent text-xs tracking-tight">{stars}</span>}
+        </div>
+
+        {/* Notes — the main feature of this view */}
+        {fic.personalNotes ? (
+          <div className="bg-elevated rounded-xl px-3 py-2.5 text-txt-secondary text-xs leading-relaxed border border-border-subtle italic flex-1">
+            "{fic.personalNotes}"
+          </div>
+        ) : (
+          <div className="bg-elevated rounded-xl px-3 py-2.5 text-txt-muted text-xs border border-dashed border-border-subtle flex-1 flex items-center justify-center">
+            <span className="opacity-50">No notes yet — click to add</span>
+          </div>
+        )}
+
+        {/* Fandom tag */}
+        {fic.fandom && (
+          <p className="text-txt-muted text-[11px] truncate">{fic.fandom}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ shelf, onAdd }) {
   const messages = {
     all:            { title: 'Your shelf is empty',      body: 'Start by adding your first fic.' },
     reading:        { title: 'Nothing in progress',      body: 'Got a WIP open in another tab? Add it here.' },
     'want-to-read': { title: 'Your reading list awaits', body: 'Paste an AO3 link and let it live here.' },
+    faves:          { title: 'No faves yet', body: 'Open any fic and tap the heart to add it here. Faves live across all shelves.' },
     maybe:          { title: 'Your Maybe pile is empty', body: 'Use the "Save to Maybe" bookmarklet on AO3 to stash fics you might want to read.' },
     read:           { title: 'No finished fics yet',     body: 'When you wrap something up, mark it read.' },
     dnf:            { title: 'Nothing here (good!)',     body: "Some fics just aren't the right fit." },
@@ -302,7 +359,7 @@ export default function MyShelf() {
   const [loading, setLoading] = useState(true);
 
   // Shelf is driven by URL param so bookmarklet links like ?shelf=maybe work
-  const VALID_SHELVES = new Set(['all','reading','want-to-read','maybe','re-reading','read','history','dnf']);
+  const VALID_SHELVES = new Set(['all','faves','reading','want-to-read','maybe','re-reading','read','history','dnf']);
   const urlShelf = searchParams.get('shelf');
   const [activeShelf, setActiveShelf] = useState(
     urlShelf && VALID_SHELVES.has(urlShelf) ? urlShelf : 'all'
@@ -978,6 +1035,13 @@ export default function MyShelf() {
           ) : (
             <EmptyState shelf={activeShelf} onAdd={() => setShowAdd(true)} />
           )
+        ) : activeShelf === 'faves' ? (
+          /* ── Faves: notes-forward card layout ── */
+          <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedFics.map(fic => (
+              <FaveCard key={fic.id} fic={fic} onClick={setSelectedFic} />
+            ))}
+          </div>
         ) : view === 'grid' ? (
           <div className="px-6 py-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
             {paginatedFics.map(fic => (

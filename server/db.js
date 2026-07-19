@@ -217,4 +217,7 @@ try { db.exec('ALTER TABLE users ADD COLUMN last_import_at TEXT DEFAULT NULL'); 
 // V4: personal API token for bookmarklet / mobile access
 try { db.exec('ALTER TABLE users ADD COLUMN api_token TEXT DEFAULT NULL'); } catch {}
 
+// V5: all-time faves flag
+try { db.exec('ALTER TABLE fics ADD COLUMN is_favorite INTEGER DEFAULT 0'); } catch {}
+
 module.exports = db;

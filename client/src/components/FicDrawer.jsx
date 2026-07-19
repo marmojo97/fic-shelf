@@ -6,6 +6,7 @@ import { updateFic, deleteFic } from '../api/index.js';
 
 const SHELVES = [
   { value: 'want-to-read', label: 'Want to Read' },
+  { value: 'maybe',        label: 'Maybe' },
   { value: 'reading',      label: 'Currently Reading' },
   { value: 'read',         label: 'Read' },
   { value: 'dnf',          label: 'Did Not Finish' },
@@ -50,6 +51,7 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
   const [shelf, setShelf]               = useState(fic.shelf);
   const [chaptersRead, setChaptersRead] = useState(fic.chaptersRead || 0);
   const [emotionalDamage, setEmotionalDamage] = useState(fic.emotionalDamage);
+  const [isFavorite, setIsFavorite]     = useState(fic.isFavorite || false);
   const [dateFinished, setDateFinished] = useState(fic.dateFinished || '');
   const [showDatePrompt, setShowDatePrompt] = useState(false);
   const [saving, setSaving]             = useState(false);
@@ -61,6 +63,7 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
     shelf         !== fic.shelf ||
     chaptersRead  !== (fic.chaptersRead || 0) ||
     emotionalDamage !== fic.emotionalDamage ||
+    isFavorite    !== (fic.isFavorite || false) ||
     dateFinished  !== (fic.dateFinished || '');
 
   const readingSpeed = 250;
@@ -77,6 +80,7 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
         shelf,
         chaptersRead: Number(chaptersRead),
         emotionalDamage,
+        isFavorite,
         dateFinished: dateFinished || '',
       });
       onUpdate(data.fic);
@@ -129,6 +133,26 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
             className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-black/30 hover:bg-black/50 flex items-center justify-center transition-colors"
           >
             <X className="w-4 h-4 text-white" />
+          </button>
+
+          {/* Favorite heart */}
+          <button
+            onClick={async () => {
+              const next = !isFavorite;
+              setIsFavorite(next);
+              try {
+                const { data } = await updateFic(fic.id, { isFavorite: next });
+                onUpdate(data.fic);
+              } catch { setIsFavorite(!next); }
+            }}
+            className="absolute top-3 left-3 z-10 w-7 h-7 rounded-full bg-black/30 hover:bg-black/50 flex items-center justify-center transition-colors"
+            title={isFavorite ? 'Remove from Faves' : 'Add to Faves'}
+          >
+            <Heart
+              className="w-4 h-4 transition-colors"
+              style={{ color: isFavorite ? '#f87171' : 'rgba(255,255,255,0.7)' }}
+              fill={isFavorite ? '#f87171' : 'none'}
+            />
           </button>
 
           {/* Fandom + Title + Author stacked at bottom of band */}
