@@ -35,7 +35,8 @@ export const addBookmark = (ficId, data) => api.post(`/fics/${ficId}/bookmarks`,
 export const deleteBookmark = (ficId, bookmarkId) => api.delete(`/fics/${ficId}/bookmarks/${bookmarkId}`);
 
 // Stats
-export const getStats = (year) => api.get('/stats', { params: year ? { year } : {} });
+// year=0 means "All Time" — must explicitly send it (0 is falsy so can't use `year ? ...`)
+export const getStats = (year) => api.get('/stats', { params: year != null ? { year } : {} });
 
 // Shelves
 export const getCustomShelves = () => api.get('/shelves/custom');

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Loader2, Flame, BookOpen, Star, Zap, Calendar, TrendingUp,
-  Target, Trophy, Gauge, CheckCircle2, BarChart2, Book,
+  Target, Trophy, Gauge, CheckCircle2, BarChart2, Book, Info,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -12,9 +13,32 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const JEWEL_COLORS = ['#990000','#6D28D9','#1D4ED8','#B05000','#276427','#0891B2','#B45309','#0F766E','#9D174D','#4F46E5'];
-const AVG_NOVEL_WORDS = 80000; // standard "average novel" benchmark
+const AVG_NOVEL_WORDS = 80000;
 const CHART_GRID = '#E5E1DB';
 const CHART_TICK = '#888888';
+
+const SHELF_COLORS = {
+  'read':         '#276427',
+  'history':      '#4F46E5',
+  'reading':      '#0891B2',
+  'want-to-read': '#1D4ED8',
+  'maybe':        '#B45309',
+  're-reading':   '#6D28D9',
+  'dnf':          '#DC2626',
+  'uncategorized':'#9CA3AF',
+};
+const SHELF_LABELS = {
+  'read':         'Read',
+  'history':      'History',
+  'reading':      'Reading',
+  'want-to-read': 'Want to Read',
+  'maybe':        'Maybe',
+  're-reading':   'Re-reading',
+  'dnf':          'DNF',
+  'uncategorized':'Uncategorized',
+};
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatCard({ icon: Icon, label, value, sub, accent = false }) {
   return (
@@ -45,6 +69,28 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
+function InfoTooltip({ text }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative inline-block">
+      <button
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        className="text-txt-muted hover:text-txt-secondary transition-colors"
+        aria-label="More info"
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+      {show && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 z-20 w-60 bg-txt-primary text-white text-xs rounded-lg px-3 py-2 shadow-xl pointer-events-none">
+          {text}
+          <div className="absolute left-1/2 -translate-x-1/2 top-full border-4 border-transparent border-t-txt-primary" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function formatWords(n) {
   if (!n) return '0';
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -52,13 +98,16 @@ function formatWords(n) {
   return String(n);
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function Stats() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [wordView, setWordView] = useState('monthly'); // 'monthly' | 'yearly' | 'daily'
+  const [wordView, setWordView] = useState('monthly');
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
@@ -92,18 +141,20 @@ export default function Stats() {
 
   const {
     totals, yearStats, annualGoal, monthlyData, byFandom, byRating, byCompletion,
-    streak, topShips, topTags, ratingDist,
-    completionRate, avgWordCount, avgWordsByYear, longestFic, readingPaceWpd, wrappedLabel,
+    streak, longestStreak, topShips, topTags, ratingDist,
+    completionRate, avgWordCount, avgWordsByYear, longestFic, readingPaceWpd, ficsPerMonth,
+    wrappedLabel, dnfStats, shelfDist,
   } = data;
 
+  const yearLabel = year === 0 ? 'All Time' : String(year);
   const goalProgress = annualGoal > 0
     ? Math.min(100, Math.round((yearStats.fics_this_year / annualGoal) * 100))
     : 0;
 
-  const totalWordsRead   = totals.total_words_read || 0;
-  const bookEquivalent   = totalWordsRead > 0 ? (totalWordsRead / AVG_NOVEL_WORDS).toFixed(1) : '0';
-  const wordsThisYear    = yearStats.words_this_year || 0;
-  const booksThisYear    = wordsThisYear > 0 ? (wordsThisYear / AVG_NOVEL_WORDS).toFixed(1) : '0';
+  const totalWordsRead  = totals.total_words_read || 0;
+  const bookEquivalent  = totalWordsRead > 0 ? (totalWordsRead / AVG_NOVEL_WORDS).toFixed(1) : '0';
+  const wordsThisYear   = yearStats.words_this_year || 0;
+  const booksThisYear   = wordsThisYear > 0 ? (wordsThisYear / AVG_NOVEL_WORDS).toFixed(1) : '0';
 
   const completionData = [
     { name: 'Complete',    value: byCompletion.find(c => c.status === 'complete')?.count    || 0, color: '#276427' },
@@ -119,44 +170,75 @@ export default function Stats() {
   ].filter(d => d.value > 0);
 
   const monthlyChartData = monthlyData.map((d, i) => ({
-    month: MONTHS[i],
-    fics:  d.fics,
-    words: d.words,
+    month:     MONTHS[i],
+    monthNum:  i + 1,
+    fics:      d.fics,
+    words:     d.words,
+    avg_words: d.avg_words || 0,
   }));
 
   const yearlyWordData = avgWordsByYear
     ? [...avgWordsByYear].reverse().map(y => ({
-        year:       y.yr,
-        words:      Math.round(y.avg_words * y.fic_count),
-        avg_words:  Math.round(y.avg_words),
-        fic_count:  y.fic_count,
+        year:      y.yr,
+        words:     Math.round(y.avg_words * y.fic_count),
+        avg_words: Math.round(y.avg_words),
+        fic_count: y.fic_count,
       }))
     : [];
 
-  // Daily estimate: pace × 30 days
   const dailyAvg = readingPaceWpd || 0;
   const dailyChartData = Array.from({ length: 30 }, (_, i) => ({
-    day: `Day ${i + 1}`,
-    words: Math.round(dailyAvg * (0.7 + Math.random() * 0.6)), // simulated daily variation around avg
+    day:   `Day ${i + 1}`,
+    words: Math.round(dailyAvg * (0.7 + Math.random() * 0.6)),
   }));
 
-  const availableYears = [];
+  // Best months (computed client-side from monthlyChartData)
+  const bestWordMonth = monthlyChartData.reduce(
+    (best, m) => m.words > 0 && (!best || m.words > best.words) ? m : best, null
+  );
+  const bestFicMonth = monthlyChartData.reduce(
+    (best, m) => m.fics > 0 && (!best || m.fics > best.fics) ? m : best, null
+  );
+
+  // Word count trend sparkline — avg words per fic by month (only months with data)
+  const wordCountTrend = monthlyChartData
+    .filter(m => m.fics > 0)
+    .map(m => ({
+      month: m.month,
+      avg:   m.avg_words || Math.round(m.words / m.fics),
+    }));
+
+  // Shelf distribution donut
+  const shelfDistData = (shelfDist || [])
+    .filter(s => s.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .map(s => ({ name: s.shelf, value: s.count }));
+
+  const availableYears = [0]; // 0 = All Time
   for (let y = new Date().getFullYear(); y >= 2020; y--) availableYears.push(y);
+
+  const DATE_INFO_MSG = 'Dates reflect when you marked fics as read. Re-import your AO3 CSV to correct historical dates.';
 
   return (
     <div className="px-6 py-6 space-y-6 max-w-6xl">
-      {/* Page header */}
+
+      {/* ── 1. Page header ── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-txt-primary font-bold text-xl">Reading Stats</h1>
           <p className="text-txt-muted text-sm mt-0.5">A love letter to your reading life</p>
         </div>
-        <select className="input-field text-sm w-auto py-1.5" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+        <select
+          className="input-field text-sm w-auto py-1.5"
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+        >
+          <option value={0}>All Time</option>
+          {availableYears.slice(1).map(y => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
 
-      {/* Reader personality */}
+      {/* ── 2. Reader personality ── */}
       {wrappedLabel && (
         <div className="card p-4 flex items-center gap-4 border-accent/30 bg-accent/5">
           <div className="text-3xl">✨</div>
@@ -167,15 +249,88 @@ export default function Stats() {
         </div>
       )}
 
-      {/* Top stats */}
+      {/* ── 3. Hero stats row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={BookOpen}   label="Total Read"   value={totals.total_read?.toLocaleString() || '0'} sub="all time" />
-        <StatCard icon={TrendingUp} label="Words Read"   value={formatWords(totalWordsRead)}                sub="in finished fics" />
-        <StatCard icon={Star}       label="Avg Rating"   value={totals.avg_rating ? Number(totals.avg_rating).toFixed(1) : '—'} sub="out of 5" />
-        <StatCard icon={Flame}      label="Streak"       value={`${streak} day${streak !== 1 ? 's' : ''}`} sub="current streak" accent />
+
+        {/* Fics Read — all time + this year split */}
+        <div className="card p-5 flex items-start gap-4">
+          <div className="p-2.5 rounded-xl bg-elevated flex-shrink-0">
+            <BookOpen className="w-5 h-5 text-txt-secondary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">Fics Read</p>
+            <div className="flex items-end gap-3 mt-0.5 flex-wrap">
+              <div>
+                <p className="text-2xl font-bold text-txt-primary">{(totals.total_read || 0).toLocaleString()}</p>
+                <p className="text-txt-muted text-xs">all time</p>
+              </div>
+              {year !== 0 && (
+                <div className="border-l border-border-subtle pl-3">
+                  <p className="text-xl font-bold text-txt-primary">{yearStats.fics_this_year}</p>
+                  <p className="text-txt-muted text-xs">in {year}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Words Read — all time */}
+        <StatCard
+          icon={TrendingUp}
+          label="Words Read"
+          value={formatWords(totalWordsRead)}
+          sub="all time"
+        />
+
+        {/* Avg Rating — with actionable empty state */}
+        <div className="card p-5 flex items-start gap-4">
+          <div className="p-2.5 rounded-xl bg-elevated flex-shrink-0">
+            <Star className="w-5 h-5 text-txt-secondary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">Avg Rating</p>
+            {totals.avg_rating ? (
+              <>
+                <p className="text-2xl font-bold text-txt-primary mt-0.5">
+                  {Number(totals.avg_rating).toFixed(1)}
+                </p>
+                <p className="text-txt-muted text-xs">out of 5 · all time</p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-txt-primary mt-0.5">—</p>
+                <button
+                  onClick={() => navigate('/shelf?shelf=read')}
+                  className="text-accent text-xs hover:underline text-left mt-0.5"
+                >
+                  Rate your finished fics
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Streak — current + longest */}
+        <div className="card p-5 flex items-start gap-4 border-accent/40 bg-accent/5">
+          <div className="p-2.5 rounded-xl bg-accent/15 flex-shrink-0">
+            <Flame className="w-5 h-5 text-accent" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">Streak</p>
+            <p className="text-2xl font-bold text-accent mt-0.5">
+              {streak} day{streak !== 1 ? 's' : ''}
+            </p>
+            <p className="text-txt-muted text-xs">
+              current
+              {longestStreak > 0 && (
+                <> · best {longestStreak}d{streak > 0 && streak === longestStreak ? ' 🏆' : ''}</>
+              )}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Words read + book equivalent hero cards */}
+      {/* ── 4. Words hero cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card p-5 col-span-1 sm:col-span-2 flex items-center gap-5 border-accent/20 bg-gradient-to-br from-white to-accent/5">
           <div className="p-3 bg-accent/10 rounded-2xl flex-shrink-0">
@@ -192,7 +347,9 @@ export default function Stats() {
           </div>
         </div>
         <div className="card p-5 flex flex-col gap-3">
-          <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">This Year ({year})</p>
+          <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">
+            {year === 0 ? 'All Time' : `This Year (${year})`}
+          </p>
           <div>
             <p className="text-txt-primary font-bold text-2xl">{wordsThisYear.toLocaleString()}</p>
             <p className="text-txt-muted text-xs">words</p>
@@ -204,11 +361,186 @@ export default function Stats() {
         </div>
       </div>
 
-      {/* Words Tracker */}
+      {/* ── 5. Two-column: Top Fandoms + Fic Breakdown donuts ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Top fandoms */}
+        <div className="card p-5">
+          <h2 className="text-txt-primary font-semibold mb-1">Top Fandoms</h2>
+          <p className="text-txt-muted text-xs mb-4">
+            based on finished fics{year !== 0 ? ` · ${year}` : ' · all time'}
+          </p>
+          {byFandom.length === 0 ? (
+            <p className="text-txt-muted text-sm">No fandom data yet.</p>
+          ) : (
+            <div className="space-y-2.5">
+              {byFandom.slice(0, 8).map((f, i) => {
+                const max = byFandom[0].count;
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    {/* title attr gives native browser tooltip with full fandom name */}
+                    <span
+                      className="text-txt-secondary text-sm truncate w-40 flex-shrink-0 cursor-default"
+                      title={f.fandom}
+                    >
+                      {f.fandom}
+                    </span>
+                    <div className="flex-1 h-2 bg-elevated rounded-full overflow-hidden border border-border-subtle">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${(f.count / max) * 100}%`,
+                          backgroundColor: JEWEL_COLORS[i % JEWEL_COLORS.length],
+                        }}
+                      />
+                    </div>
+                    <span className="text-txt-muted text-xs w-6 text-right">{f.count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Fic breakdown donuts */}
+        <div className="card p-5">
+          <h2 className="text-txt-primary font-semibold mb-1">Fic Breakdown</h2>
+          <p className="text-txt-muted text-xs mb-4">across your shelved fics · all time</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-txt-muted text-xs uppercase tracking-wider mb-3">Completion</p>
+              {completionData.length > 0 ? (
+                <div className="flex justify-center">
+                  <PieChart width={120} height={120}>
+                    <Pie data={completionData} cx={55} cy={55} innerRadius={30} outerRadius={55} dataKey="value" paddingAngle={2}>
+                      {completionData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </div>
+              ) : <p className="text-txt-muted text-sm">No data</p>}
+              <div className="space-y-1 mt-2">
+                {completionData.map((d, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="text-txt-secondary">{d.name}</span>
+                    <span className="text-txt-muted ml-auto">{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-txt-muted text-xs uppercase tracking-wider mb-3">Content Rating</p>
+              {ratingChartData.length > 0 ? (
+                <div className="flex justify-center">
+                  <PieChart width={120} height={120}>
+                    <Pie data={ratingChartData} cx={55} cy={55} innerRadius={30} outerRadius={55} dataKey="value" paddingAngle={2}>
+                      {ratingChartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </div>
+              ) : <p className="text-txt-muted text-sm">No data</p>}
+              <div className="space-y-1 mt-2">
+                {ratingChartData.map((d, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="text-txt-secondary">{d.name}</span>
+                    <span className="text-txt-muted ml-auto">{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 6. DNF card ── */}
+      {(dnfStats?.count ?? 0) > 0 && (
+        <div className="card p-5">
+          {dnfStats.count <= 1 ? (
+            <p className="text-txt-secondary text-sm">
+              You rarely give up on a fic — {dnfStats.count} DNF all time 🎖️
+            </p>
+          ) : (
+            <>
+              <h2 className="text-txt-primary font-semibold mb-3">Did Not Finish</h2>
+              <div className="flex items-start gap-6 flex-wrap">
+                <div>
+                  <p className="text-3xl font-bold text-txt-primary">{dnfStats.count}</p>
+                  <p className="text-txt-muted text-xs mt-0.5">all time</p>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-red-600">{dnfStats.rate}%</p>
+                  <p className="text-txt-muted text-xs mt-0.5">DNF rate · all time</p>
+                </div>
+                {dnfStats.topFandoms?.length > 0 && (
+                  <div className="flex-1 min-w-[160px]">
+                    <p className="text-txt-muted text-xs mb-2">Most DNF'd fandoms</p>
+                    {dnfStats.topFandoms.map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 mb-1.5">
+                        <span className="text-txt-secondary text-sm truncate flex-1" title={f.fandom}>{f.fandom}</span>
+                        <span className="text-txt-muted text-xs flex-shrink-0">×{f.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── 7. Ships (moved up — before Words Tracker) ── */}
+      {topShips.length > 0 && (
+        <div className="card p-5">
+          <h2 className="text-txt-primary font-semibold mb-1">💕 Ships You Can't Quit</h2>
+          <p className="text-txt-muted text-xs mb-3">based on your finished fics · all time</p>
+          <div className="flex flex-wrap gap-2">
+            {topShips.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-elevated border border-border-subtle text-sm"
+                style={{ color: JEWEL_COLORS[i % JEWEL_COLORS.length] }}
+              >
+                {s.ship}
+                <span className="text-txt-muted text-xs">×{s.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 8. Tags (moved up — before Words Tracker) ── */}
+      {topTags.length > 0 && (
+        <div className="card p-5">
+          <h2 className="text-txt-primary font-semibold mb-1">✨ Your Tag Fingerprint</h2>
+          <p className="text-txt-muted text-xs mb-3">based on your finished fics · all time</p>
+          <div className="flex flex-wrap gap-2">
+            {topTags.map((t, i) => {
+              const max = topTags[0].count;
+              const size = 11 + Math.round((t.count / max) * 8);
+              return (
+                <span
+                  key={i}
+                  className="px-2.5 py-1 rounded-full bg-elevated border border-border-subtle text-txt-secondary hover:text-txt-primary transition-colors cursor-default"
+                  style={{ fontSize: `${size}px` }}
+                >
+                  {t.tag}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── 9. Words Read Tracker ── */}
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-txt-primary font-semibold">Words Read Tracker</h2>
-          {/* View switcher */}
+          <div className="flex items-center gap-2">
+            <h2 className="text-txt-primary font-semibold">Words Read Tracker</h2>
+            <InfoTooltip text={DATE_INFO_MSG} />
+          </div>
           <div className="flex items-center bg-elevated rounded-lg p-1 gap-0.5 border border-border-subtle">
             {[
               { key: 'daily',   label: 'Daily' },
@@ -232,7 +564,7 @@ export default function Stats() {
 
         {wordView === 'monthly' && (
           <>
-            <p className="text-txt-muted text-xs mb-3">Words read per month in {year}</p>
+            <p className="text-txt-muted text-xs mb-3">Words read per month · {yearLabel}</p>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={monthlyChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
@@ -242,22 +574,32 @@ export default function Stats() {
                 <Bar dataKey="words" name="Words" fill="#990000" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            {/* Monthly summary row */}
+            {/* Monthly summary tiles */}
             <div className="mt-3 grid grid-cols-4 sm:grid-cols-6 gap-2">
               {monthlyChartData.filter(m => m.words > 0).map((m, i) => (
-                <div key={i} className="bg-elevated rounded-lg px-2 py-2 text-center">
+                <div key={i} className={`bg-elevated rounded-lg px-2 py-2 text-center ${bestWordMonth?.month === m.month ? 'ring-1 ring-accent/40' : ''}`}>
                   <p className="text-txt-muted text-xs">{m.month}</p>
                   <p className="text-txt-primary font-semibold text-xs mt-0.5">{formatWords(m.words)}</p>
                   <p className="text-txt-muted text-[10px]">{m.fics} fic{m.fics !== 1 ? 's' : ''}</p>
                 </div>
               ))}
             </div>
+            {/* Best month callout */}
+            {bestWordMonth && bestWordMonth.words > 0 && (
+              <div className="mt-3 bg-accent/5 border border-accent/20 rounded-xl p-3">
+                <p className="text-txt-secondary text-sm">
+                  📖 Your best month was{' '}
+                  <span className="font-semibold text-txt-primary">{bestWordMonth.month} {yearLabel !== 'All Time' ? yearLabel : ''}</span>
+                  {' '}— {formatWords(bestWordMonth.words)} words across {bestWordMonth.fics} fic{bestWordMonth.fics !== 1 ? 's' : ''}
+                </p>
+              </div>
+            )}
           </>
         )}
 
         {wordView === 'yearly' && (
           <>
-            <p className="text-txt-muted text-xs mb-3">Total words read per year</p>
+            <p className="text-txt-muted text-xs mb-3">Total words read per year · all time</p>
             {yearlyWordData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={200}>
@@ -289,7 +631,7 @@ export default function Stats() {
         {wordView === 'daily' && (
           <>
             <p className="text-txt-muted text-xs mb-3">
-              Average {formatWords(dailyAvg)} words/day — estimated daily reading activity
+              Average {formatWords(dailyAvg)} words/day — estimated daily reading activity · all time
             </p>
             {dailyAvg > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
@@ -307,7 +649,7 @@ export default function Stats() {
             {dailyAvg > 0 && (
               <div className="mt-3 grid grid-cols-3 gap-3">
                 <div className="bg-elevated rounded-xl px-3 py-3 border border-border-subtle">
-                  <p className="text-txt-muted text-xs">Daily avg</p>
+                  <p className="text-txt-muted text-xs">Daily avg · all time</p>
                   <p className="text-txt-primary font-bold text-lg">{formatWords(dailyAvg)}</p>
                   <p className="text-txt-muted text-xs">words</p>
                 </div>
@@ -327,9 +669,12 @@ export default function Stats() {
         )}
       </div>
 
-      {/* Monthly fics chart */}
+      {/* ── 10. Monthly fics chart ── */}
       <div className="card p-5">
-        <h2 className="text-txt-primary font-semibold mb-4">Fics Read Monthly ({year})</h2>
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-txt-primary font-semibold">Fics Read Monthly ({yearLabel})</h2>
+          <InfoTooltip text={DATE_INFO_MSG} />
+        </div>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={monthlyChartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
@@ -339,42 +684,125 @@ export default function Stats() {
             <Bar dataKey="fics" name="Fics" fill="#6D28D9" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
+        {/* Best month callout */}
+        {bestFicMonth && bestFicMonth.fics > 0 && (
+          <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-3">
+            <p className="text-purple-900 text-sm">
+              📚 Your most active month was{' '}
+              <span className="font-semibold">{bestFicMonth.month} {yearLabel !== 'All Time' ? yearLabel : ''}</span>
+              {' '}— {bestFicMonth.fics} fic{bestFicMonth.fics !== 1 ? 's' : ''} read
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* V2 row */}
+      {/* ── 11. V2 stats row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
         {completionRate !== null && (
-          <StatCard icon={CheckCircle2} label="Completion Rate" value={`${completionRate}%`} sub="of started fics" />
+          <StatCard
+            icon={CheckCircle2}
+            label="Completion Rate"
+            value={`${completionRate}%`}
+            sub="of started fics · all time"
+          />
         )}
+
+        {/* Avg word count + sparkline trend */}
         {avgWordCount > 0 && (
-          <StatCard icon={BarChart2} label="Avg Word Count" value={formatWords(avgWordCount)} sub="per finished fic" />
+          <div className="card p-5 flex items-start gap-4">
+            <div className="p-2.5 rounded-xl bg-elevated flex-shrink-0">
+              <BarChart2 className="w-5 h-5 text-txt-secondary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">Avg Word Count</p>
+              <p className="text-2xl font-bold text-txt-primary mt-0.5">{formatWords(avgWordCount)}</p>
+              <p className="text-txt-muted text-xs">per finished fic · all time</p>
+              {wordCountTrend.length > 2 && (
+                <div className="mt-2">
+                  <p className="text-txt-muted text-[10px] mb-1">Trend this year ↗</p>
+                  <ResponsiveContainer width="100%" height={36}>
+                    <LineChart data={wordCountTrend} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
+                      <Line type="monotone" dataKey="avg" stroke="#990000" strokeWidth={1.5} dot={false} />
+                      <Tooltip
+                        content={({ active, payload, label }) =>
+                          active && payload?.length ? (
+                            <div className="bg-surface border border-border rounded px-2 py-1 shadow text-xs">
+                              <p className="text-txt-muted">{label}</p>
+                              <p className="font-medium text-txt-primary">{formatWords(payload[0].value)} avg</p>
+                            </div>
+                          ) : null
+                        }
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          </div>
         )}
-        {readingPaceWpd !== null && (
-          <StatCard icon={Gauge} label="Reading Pace" value={`${formatWords(readingPaceWpd)}/day`} sub="words on avg" />
+
+        {/* Reading Pace — fics/month + words/day side by side */}
+        {(readingPaceWpd !== null || ficsPerMonth !== null) && (
+          <div className="card p-5 flex items-start gap-4">
+            <div className="p-2.5 rounded-xl bg-elevated flex-shrink-0">
+              <Gauge className="w-5 h-5 text-txt-secondary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">Reading Pace</p>
+              <div className="flex items-end gap-3 mt-0.5 flex-wrap">
+                {ficsPerMonth !== null && (
+                  <div>
+                    <p className="text-2xl font-bold text-txt-primary">{ficsPerMonth}</p>
+                    <p className="text-txt-muted text-xs">fics/month avg</p>
+                  </div>
+                )}
+                {readingPaceWpd !== null && ficsPerMonth !== null && (
+                  <div className="border-l border-border-subtle pl-3">
+                    <p className="text-xl font-bold text-txt-primary">{formatWords(readingPaceWpd)}</p>
+                    <p className="text-txt-muted text-xs">words/day avg</p>
+                  </div>
+                )}
+                {readingPaceWpd !== null && ficsPerMonth === null && (
+                  <div>
+                    <p className="text-2xl font-bold text-txt-primary">{formatWords(readingPaceWpd)}</p>
+                    <p className="text-txt-muted text-xs">words/day avg</p>
+                  </div>
+                )}
+              </div>
+              <p className="text-txt-muted text-[10px] mt-0.5">avg reading pace · all time</p>
+            </div>
+          </div>
         )}
+
         {longestFic && (
           <div className="card p-5 flex items-start gap-4 col-span-2 lg:col-span-1">
-            <div className="p-2.5 rounded-xl bg-elevated">
+            <div className="p-2.5 rounded-xl bg-elevated flex-shrink-0">
               <Trophy className="w-5 h-5 text-yellow-600" />
             </div>
             <div className="min-w-0">
               <p className="text-txt-muted text-xs uppercase tracking-wider font-medium">Longest Fic Read</p>
-              <p className="text-txt-primary font-bold text-sm leading-tight mt-0.5 truncate">{longestFic.title}</p>
-              <p className="text-txt-muted text-xs">{formatWords(longestFic.word_count)} words</p>
+              <p className="text-txt-primary font-bold text-sm leading-tight mt-0.5 truncate" title={longestFic.title}>
+                {longestFic.title}
+              </p>
+              <p className="text-txt-muted text-xs">{formatWords(longestFic.word_count)} words · all time</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Annual challenge */}
+      {/* ── 12. Annual challenge ── */}
       <div className="card p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Target className="w-5 h-5 text-accent" />
-            <h2 className="text-txt-primary font-semibold">{year} Reading Challenge</h2>
+            <h2 className="text-txt-primary font-semibold">
+              {year === 0 ? 'Reading Challenge' : `${year} Reading Challenge`}
+            </h2>
           </div>
           <span className="text-txt-muted text-sm">
-            <span className="text-txt-primary font-semibold text-lg">{yearStats.fics_this_year}</span> / {annualGoal} fics
+            <span className="text-txt-primary font-semibold text-lg">{yearStats.fics_this_year}</span>
+            {' '}/ {annualGoal} fics
           </span>
         </div>
         <div className="h-3 bg-elevated rounded-full overflow-hidden mb-1.5 border border-border-subtle">
@@ -391,97 +819,25 @@ export default function Stats() {
         </div>
         <div className="mt-3 grid grid-cols-2 gap-4">
           <div className="bg-elevated rounded-lg px-3 py-2 border border-border-subtle">
-            <p className="text-txt-muted text-xs">Fics this year</p>
+            <p className="text-txt-muted text-xs">Fics {year === 0 ? 'all time' : `in ${year}`}</p>
             <p className="text-txt-primary font-bold text-lg">{yearStats.fics_this_year}</p>
           </div>
           <div className="bg-elevated rounded-lg px-3 py-2 border border-border-subtle">
-            <p className="text-txt-muted text-xs">Words this year</p>
+            <p className="text-txt-muted text-xs">Words {year === 0 ? 'all time' : `in ${year}`}</p>
             <p className="text-txt-primary font-bold text-lg">{formatWords(wordsThisYear)}</p>
           </div>
         </div>
       </div>
 
-      {/* Two columns — fandoms + breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card p-5">
-          <h2 className="text-txt-primary font-semibold mb-4">Top Fandoms</h2>
-          {byFandom.length === 0 ? (
-            <p className="text-txt-muted text-sm">No fandom data yet.</p>
-          ) : (
-            <div className="space-y-2.5">
-              {byFandom.slice(0, 8).map((f, i) => {
-                const max = byFandom[0].count;
-                return (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="text-txt-secondary text-sm truncate w-40 flex-shrink-0">{f.fandom}</span>
-                    <div className="flex-1 h-2 bg-elevated rounded-full overflow-hidden border border-border-subtle">
-                      <div className="h-full rounded-full" style={{ width: `${(f.count / max) * 100}%`, backgroundColor: JEWEL_COLORS[i % JEWEL_COLORS.length] }} />
-                    </div>
-                    <span className="text-txt-muted text-xs w-6 text-right">{f.count}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="card p-5">
-          <h2 className="text-txt-primary font-semibold mb-4">Fic Breakdown</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-txt-muted text-xs uppercase tracking-wider mb-3">Completion</p>
-              {completionData.length > 0 ? (
-                <div className="flex justify-center">
-                  <PieChart width={120} height={120}>
-                    <Pie data={completionData} cx={55} cy={55} innerRadius={30} outerRadius={55} dataKey="value" paddingAngle={2}>
-                      {completionData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </div>
-              ) : <p className="text-txt-muted text-sm">No data</p>}
-              <div className="space-y-1 mt-2">
-                {completionData.map((d, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
-                    <span className="text-txt-secondary">{d.name}</span>
-                    <span className="text-txt-muted ml-auto">{d.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-txt-muted text-xs uppercase tracking-wider mb-3">Content Rating</p>
-              {ratingChartData.length > 0 ? (
-                <div className="flex justify-center">
-                  <PieChart width={120} height={120}>
-                    <Pie data={ratingChartData} cx={55} cy={55} innerRadius={30} outerRadius={55} dataKey="value" paddingAngle={2}>
-                      {ratingChartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </div>
-              ) : <p className="text-txt-muted text-sm">No data</p>}
-              <div className="space-y-1 mt-2">
-                {ratingChartData.map((d, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
-                    <span className="text-txt-secondary">{d.name}</span>
-                    <span className="text-txt-muted ml-auto">{d.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Rating distribution */}
+      {/* ── 13. Rating distribution ── */}
       {ratingDist.length > 0 && (
         <div className="card p-5">
           <h2 className="text-txt-primary font-semibold mb-4">Your Rating Distribution</h2>
           <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={ratingDist.map(r => ({ rating: `★ ${r.rating}`, count: r.count }))} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+            <BarChart
+              data={ratingDist.map(r => ({ rating: `★ ${r.rating}`, count: r.count }))}
+              margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
               <XAxis dataKey="rating" tick={{ fill: CHART_TICK, fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: CHART_TICK, fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -492,59 +848,42 @@ export default function Stats() {
         </div>
       )}
 
-      {/* Top ships */}
-      {topShips.length > 0 && (
+      {/* ── 14. Shelf distribution donut (replaces Library Summary) ── */}
+      {shelfDistData.length > 0 && (
         <div className="card p-5">
-          <h2 className="text-txt-primary font-semibold mb-4">💕 Ships You Can't Quit</h2>
-          <div className="flex flex-wrap gap-2">
-            {topShips.map((s, i) => (
-              <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-elevated border border-border-subtle text-sm" style={{ color: JEWEL_COLORS[i % JEWEL_COLORS.length] }}>
-                {s.ship}
-                <span className="text-txt-muted text-xs">×{s.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tag cloud */}
-      {topTags.length > 0 && (
-        <div className="card p-5">
-          <h2 className="text-txt-primary font-semibold mb-4">✨ Your Tag Fingerprint</h2>
-          <div className="flex flex-wrap gap-2">
-            {topTags.map((t, i) => {
-              const max = topTags[0].count;
-              const size = 11 + Math.round((t.count / max) * 8);
-              return (
-                <span key={i} className="px-2.5 py-1 rounded-full bg-elevated border border-border-subtle text-txt-secondary hover:text-txt-primary transition-colors cursor-default"
-                  style={{ fontSize: `${size}px` }}>
-                  {t.tag}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Library summary */}
-      <div className="card p-5">
-        <h2 className="text-txt-primary font-semibold mb-4">Library Summary</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {[
-            { label: 'Total fics',        value: totals.total_fics       || 0 },
-            { label: 'Finished',          value: totals.total_read        || 0 },
-            { label: 'Currently reading', value: totals.currently_reading || 0 },
-            { label: 'Want to read',      value: totals.want_to_read      || 0 },
-            { label: 'DNF',               value: totals.dnf               || 0 },
-            { label: 'Re-reading',        value: totals.rereading         || 0 },
-          ].map((stat, i) => (
-            <div key={i} className="bg-elevated rounded-xl px-3 py-3 border border-border-subtle">
-              <p className="text-txt-muted text-xs">{stat.label}</p>
-              <p className="text-txt-primary font-bold text-xl mt-0.5">{stat.value.toLocaleString()}</p>
+          <h2 className="text-txt-primary font-semibold mb-4">Your Reading Breakdown</h2>
+          <div className="flex items-start gap-6 flex-wrap">
+            <PieChart width={180} height={180}>
+              <Pie
+                data={shelfDistData}
+                cx={85} cy={85}
+                innerRadius={45} outerRadius={80}
+                dataKey="value"
+                paddingAngle={2}
+              >
+                {shelfDistData.map((entry, i) => (
+                  <Cell key={i} fill={SHELF_COLORS[entry.name] || '#9CA3AF'} />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+            </PieChart>
+            <div className="space-y-2 flex-1 min-w-[160px]">
+              {shelfDistData.map((d, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: SHELF_COLORS[d.name] || '#9CA3AF' }}
+                  />
+                  <span className="text-txt-secondary flex-1">
+                    {SHELF_LABELS[d.name] || d.name}
+                  </span>
+                  <span className="text-txt-muted font-medium">{d.value.toLocaleString()}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="h-4" />
     </div>
