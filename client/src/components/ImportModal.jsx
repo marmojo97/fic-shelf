@@ -1,27 +1,23 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   X, Upload, FileText, CheckCircle2, AlertCircle, Loader2,
   BookOpen, ChevronDown, Calendar, Filter, CheckSquare, Square, Info,
 } from 'lucide-react';
 
-const LAST_IMPORT_KEY = 'archivd_last_import_date';
-
-function getLastImportDate() {
-  try {
-    const raw = localStorage.getItem(LAST_IMPORT_KEY);
-    if (!raw) return null;
-    const d = new Date(raw);
-    return isNaN(d.getTime()) ? null : d;
-  } catch { return null; }
-}
-
-function saveLastImportDate() {
-  try { localStorage.setItem(LAST_IMPORT_KEY, new Date().toISOString()); } catch {}
+function parseLastImport(raw) {
+  if (!raw) return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 function formatLastImport(d) {
   if (!d) return null;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function toYearMonth(d) {
+  if (!d) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 import { previewAo3Csv, confirmAo3Csv, bulkSortFics } from '../api/index.js';
 
@@ -144,18 +140,21 @@ export default function ImportModal({ onClose, onImported }) {
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef(null);
 
-  // Last import date — read once on mount
-  const lastImport = useMemo(() => getLastImportDate(), []);
-  const lastImportLabel = formatLastImport(lastImport);
-
   // Import mode: 'all' = everything (dupes skipped) | 'range' = filter by last visited date
   const [importMode, setImportMode] = useState('all');
-  // Pre-fill rangeFrom with the month of the last import if one exists
-  const defaultRangeFrom = lastImport
-    ? `${lastImport.getFullYear()}-${String(lastImport.getMonth() + 1).padStart(2, '0')}`
-    : '';
-  const [rangeFrom, setRangeFrom] = useState(defaultRangeFrom); // YYYY-MM
+  const [rangeFrom, setRangeFrom] = useState(''); // YYYY-MM
   const [rangeTo, setRangeTo]     = useState(''); // YYYY-MM
+
+  // Derive last import date from the preview API response (already stored in DB as last_import_at)
+  const lastImport = useMemo(() => parseLastImport(preview?.lastImportAt), [preview]);
+  const lastImportLabel = formatLastImport(lastImport);
+
+  // When preview loads with a lastImportAt, auto-fill rangeFrom if not already set
+  useEffect(() => {
+    if (lastImport && !rangeFrom) {
+      setRangeFrom(toYearMonth(lastImport));
+    }
+  }, [lastImport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Bulk sort state
   const [dateRange, setDateRange] = useState('all');
@@ -198,7 +197,6 @@ export default function ImportModal({ onClose, onImported }) {
         ? (() => { const [y, m] = rangeTo.split('-').map(Number); return new Date(y, m, 0).toISOString().slice(0, 10); })()
         : '';
       const { data } = await confirmAo3Csv(file, 'history', fromDate, toDate);
-      saveLastImportDate();
       setResult(data);
       setSelected(new Set());
       setAssignments({});
