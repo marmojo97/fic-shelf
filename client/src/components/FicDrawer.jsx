@@ -53,7 +53,6 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
   const [emotionalDamage, setEmotionalDamage] = useState(fic.emotionalDamage);
   const [isFavorite, setIsFavorite]     = useState(fic.isFavorite || false);
   const [dateFinished, setDateFinished] = useState(fic.dateFinished || '');
-  const [showDatePrompt, setShowDatePrompt] = useState(false);
   const [saving, setSaving]             = useState(false);
   const [saved, setSaved]               = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -111,7 +110,17 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
 
   function handleShelfClick(newShelf) {
     setShelf(newShelf);
-    if (newShelf === 'read' && !dateFinished) setShowDatePrompt(true);
+    if (newShelf === 'read' && !dateFinished) {
+      // Pre-populate with last visited date, falling back to today
+      const raw = fic.lastVisited || fic.addedAt;
+      const parsed = raw ? new Date(raw) : null;
+      const fallback = new Date().toISOString().split('T')[0];
+      setDateFinished(
+        parsed && !isNaN(parsed.getTime())
+          ? parsed.toISOString().split('T')[0]
+          : fallback
+      );
+    }
   }
 
   return (
@@ -351,30 +360,23 @@ export default function FicDrawer({ fic, onClose, onUpdate, onDelete }) {
               </div>
             </div>
 
-            {/* Date finished prompt */}
-            {showDatePrompt && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+            {/* Date finished — shown whenever shelf is 'read' */}
+            {shelf === 'read' && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3.5 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-green-700" />
-                  <p className="text-green-800 text-sm font-medium">When did you finish this?</p>
+                  <Calendar className="w-4 h-4 text-green-700 flex-shrink-0" />
+                  <p className="text-green-800 text-sm font-medium">Date finished</p>
                 </div>
                 <input
-                  type="date" className="input-field text-sm"
+                  type="date"
+                  className="input-field text-sm"
                   value={dateFinished}
                   max={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setDateFinished(e.target.value)}
                 />
-                <div className="flex gap-2">
-                  <button onClick={() => setShowDatePrompt(false)} className="btn-primary text-xs py-1.5 px-3">
-                    Set date
-                  </button>
-                  <button
-                    onClick={() => { setDateFinished(''); setShowDatePrompt(false); }}
-                    className="text-xs text-txt-muted hover:text-txt-secondary px-2"
-                  >
-                    Skip
-                  </button>
-                </div>
+                {fic.lastVisited && dateFinished === new Date(fic.lastVisited).toISOString().split('T')[0] && (
+                  <p className="text-green-700 text-xs">Pre-filled from your last visit — edit if needed.</p>
+                )}
               </div>
             )}
 
