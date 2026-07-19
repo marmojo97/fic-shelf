@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Smartphone, Copy, RefreshCw, CheckCircle2, AlertCircle,
-  Loader2, BookOpen, Info, CircleDashed,
+  Loader2, BookOpen, Info, CircleDashed, BookMarked,
 } from 'lucide-react';
 import { getApiToken, regenerateApiToken } from '../api/index.js';
 
@@ -26,12 +26,25 @@ function buildBookmarklet(apiUrl, token, shelf = 'history', frontendUrl = '') {
   return `javascript:${encodeURIComponent(src)}`;
 }
 
+/**
+ * Builds the "Mark chapter read" bookmarklet.
+ * Works on AO3 work pages AND individual chapter pages.
+ * Detects the current chapter number from the chapter select dropdown.
+ * If the fic is already in the library it updates chapters_read.
+ * If new, it adds it to the Reading shelf.
+ */
+function buildChapterBookmarklet(apiUrl, token, frontendUrl = '') {
+  const src = `(function(){var m=location.href.match(/archiveofourown\\.org\\/works\\/(\\d+)/);if(!m){alert('Open an AO3 work or chapter page first!');return;}var workId=m[1];var chapterNum=1;var sel=document.querySelector('select#selected_id');if(sel){chapterNum=sel.selectedIndex+1;}else{var chEl=document.querySelector('dd.chapters');if(chEl){var parts=chEl.textContent.trim().split('/');chapterNum=parseInt(parts[0])||1;}}var q=function(s){var e=document.querySelector(s);return e?e.textContent.trim():'';};var qa=function(s){return Array.from(document.querySelectorAll(s)).map(function(e){return e.textContent.trim();}).join('; ');};var title=q('h2.title.heading')||q('.title.heading');var author=q('a[rel="author"]')||'Anonymous';var fandoms=qa('.fandom.tags a.tag');var rating=q('.rating.tags a');var warnings=qa('.warning.tags a.tag');var ships=qa('.relationship.tags a.tag');var chars=qa('.character.tags a.tag');var tags=qa('.freeform.tags a.tag');var words=q('dd.words').replace(/,/g,'')||'0';var chaps=q('dd.chapters')||'?/?';var sv=q('dd.status');var comp=sv==='Completed'?'Complete Work':'Work in Progress';var sumEl=document.querySelector('.summary .userstuff')||document.querySelector('blockquote.userstuff');var summary=sumEl?sumEl.textContent.replace(/\\s+/g,' ').trim():'';var t=document.createElement('div');t.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:#1a2e2e;color:#e2e8f0;padding:14px 20px;border-radius:14px;font-family:-apple-system,sans-serif;font-size:14px;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.5);border:1px solid #2d4f4f;transition:opacity .3s';t.textContent='Logging chapter '+chapterNum+'…';document.body.appendChild(t);fetch('${apiUrl}/fics/mark-chapter',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${token}'},body:JSON.stringify({workId:workId,chapterNum:chapterNum,title:title,author:author,fandoms:fandoms,fandom:fandoms.split('; ')[0]||'',rating:rating,warnings:warnings,relationships:ships,characters:chars,freeforms:tags,words:words,chapters:chaps,completion:comp,summary:summary})}).then(function(r){return r.json();}).then(function(d){if(d.error)throw new Error(d.error);t.style.background='#1a3a2a';t.style.borderColor='#2d7a4f';t.innerHTML='✓ Ch. '+d.chapterNum+' logged'+(d.updated?'':' — added to Reading')+' <a href="${frontendUrl}/shelf?shelf=reading" target="_blank" style="color:#7dd3b0;text-decoration:underline;margin-left:4px;">View →</a>';setTimeout(function(){t.style.opacity='0';setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},300);},4000);}).catch(function(e){t.style.background='#3a1a1a';t.style.borderColor='#7a2d2d';t.textContent='✗ '+(e.message||'Could not log chapter');setTimeout(function(){t.style.opacity='0';setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},300);},3500);});})();`;
+  return `javascript:${encodeURIComponent(src)}`;
+}
+
 export default function Settings() {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedMaybe, setCopiedMaybe] = useState(false);
+  const [copiedChapter, setCopiedChapter] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [error, setError] = useState('');
 
@@ -49,9 +62,10 @@ export default function Settings() {
 
   useEffect(() => { loadToken(); }, [loadToken]);
 
-  const appOrigin           = window.location.origin;
-  const bookmarkletUrl      = token ? buildBookmarklet(API_BASE, token, 'read',  appOrigin) : '';
-  const bookmarkletMaybeUrl = token ? buildBookmarklet(API_BASE, token, 'maybe', appOrigin) : '';
+  const appOrigin             = window.location.origin;
+  const bookmarkletUrl        = token ? buildBookmarklet(API_BASE, token, 'read',  appOrigin) : '';
+  const bookmarkletMaybeUrl   = token ? buildBookmarklet(API_BASE, token, 'maybe', appOrigin) : '';
+  const bookmarkletChapterUrl = token ? buildChapterBookmarklet(API_BASE, token, appOrigin)   : '';
 
   async function handleRegenerate() {
     if (!confirmRegen) { setConfirmRegen(true); return; }
@@ -82,6 +96,14 @@ export default function Settings() {
       await navigator.clipboard.writeText(bookmarkletMaybeUrl);
       setCopiedMaybe(true);
       setTimeout(() => setCopiedMaybe(false), 2500);
+    } catch {}
+  }
+
+  async function handleCopyChapter() {
+    try {
+      await navigator.clipboard.writeText(bookmarkletChapterUrl);
+      setCopiedChapter(true);
+      setTimeout(() => setCopiedChapter(false), 2500);
     } catch {}
   }
 
@@ -290,6 +312,89 @@ export default function Settings() {
                   <><CheckCircle2 className="w-4 h-4" /> Copied!</>
                 ) : (
                   <><Copy className="w-4 h-4" /> Copy Maybe bookmarklet code</>
+                )}
+              </button>
+            </div>
+          </>
+        ) : null}
+      </section>
+
+      {/* ── Mark Chapter Read bookmarklet ── */}
+      <section className="bg-surface border border-border rounded-2xl p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <BookMarked className="w-5 h-5 text-accent" />
+          </div>
+          <div>
+            <h2 className="text-txt-primary font-semibold">Mark chapter as read</h2>
+            <p className="text-txt-muted text-sm">
+              Reading an ongoing fic? Tap this on any AO3 chapter page to log your progress. It knows which chapter you're on automatically.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-2 text-txt-muted text-xs bg-elevated rounded-xl p-3">
+          <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-accent/60" />
+          <span>
+            Works on individual chapter pages (<span className="font-mono text-accent/70">…/chapters/…</span>) and on the main work page. If the fic isn't in your library yet it gets added to your Reading shelf automatically.
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-txt-muted text-sm py-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Loading your token…</span>
+          </div>
+        ) : token ? (
+          <>
+            {/* Desktop */}
+            <div className="hidden sm:block">
+              <p className="text-txt-secondary text-sm font-medium mb-2">On desktop — drag to your bookmarks bar:</p>
+              <a
+                href={bookmarkletChapterUrl}
+                onClick={(e) => { e.preventDefault(); alert("Drag this link to your bookmarks bar — don't click it here!"); }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-elevated border border-border rounded-xl text-txt-primary text-sm font-medium hover:border-accent/50 cursor-grab active:cursor-grabbing transition-colors"
+                draggable="true"
+              >
+                <BookMarked className="w-4 h-4 text-accent" />
+                + Log chapter
+              </a>
+            </div>
+
+            {/* Mobile */}
+            <div>
+              <p className="text-txt-secondary text-sm font-medium mb-2">On mobile:</p>
+              <ol className="text-txt-muted text-sm space-y-2 list-none">
+                <li className="flex gap-2.5">
+                  <span className="w-5 h-5 bg-accent/20 text-accent rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold">1</span>
+                  <span>Tap <strong className="text-txt-secondary">Copy code</strong> below</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="w-5 h-5 bg-accent/20 text-accent rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold">2</span>
+                  <span>In Safari, bookmark any page (tap Share → Add Bookmark)</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="w-5 h-5 bg-accent/20 text-accent rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold">3</span>
+                  <span>Edit that bookmark: rename it <strong className="text-txt-secondary">+ Log chapter</strong> and paste the code as the URL</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="w-5 h-5 bg-accent/20 text-accent rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold">4</span>
+                  <span>On any AO3 chapter page, tap it — your progress is logged instantly</span>
+                </li>
+              </ol>
+
+              <button
+                onClick={handleCopyChapter}
+                className={`mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  copiedChapter
+                    ? 'bg-green-900/30 border border-green-700/40 text-green-400'
+                    : 'bg-elevated border border-border text-txt-primary hover:border-accent/50'
+                }`}
+              >
+                {copiedChapter ? (
+                  <><CheckCircle2 className="w-4 h-4" /> Copied!</>
+                ) : (
+                  <><Copy className="w-4 h-4" /> Copy chapter bookmarklet code</>
                 )}
               </button>
             </div>

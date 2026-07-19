@@ -517,4 +517,93 @@ router.post('/quick-add', (req, res) => {
   res.json({ id, message: `Added to ${shelfLabel} shelf` });
 });
 
+// POST /api/fics/mark-chapter — chapter-progress bookmarklet
+// If the fic is already in the library: update chapters_read + last_visited.
+// If new: add to Reading shelf with chapters_read = chapterNum.
+router.post('/mark-chapter', (req, res) => {
+  const userId = req.userId;
+  const {
+    workId, chapterNum,
+    // metadata for new-fic creation
+    title, author, fandom, fandoms, rating, warnings,
+    relationships, characters, freeforms, words, chapters,
+    completion, summary,
+  } = req.body;
+
+  if (!workId) return res.status(400).json({ error: 'workId is required' });
+
+  const sourceUrl = `https://archiveofourown.org/works/${workId}`;
+  const today = new Date().toISOString().slice(0, 10);
+  const chapter = Math.max(1, parseInt(chapterNum) || 1);
+
+  // ── Try to find existing fic (match on work URL or work URL prefix) ──────
+  const existing = db.prepare(
+    `SELECT * FROM fics WHERE user_id = ? AND (source_url = ? OR source_url LIKE ?)`
+  ).get(userId, sourceUrl, `${sourceUrl}/%`);
+
+  if (existing) {
+    // Never go backwards — keep whichever is higher
+    const newChaptersRead = Math.max(existing.chapters_read || 0, chapter);
+    db.prepare(`
+      UPDATE fics
+      SET chapters_read = ?,
+          last_visited  = ?,
+          total_visits  = total_visits + 1,
+          updated_at    = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(newChaptersRead, today, existing.id);
+
+    return res.json({
+      updated: true,
+      chapterNum: newChaptersRead,
+      ficTitle: existing.title,
+      message: `Chapter ${newChaptersRead} logged for "${existing.title}"`,
+    });
+  }
+
+  // ── New fic — add to Reading shelf ───────────────────────────────────────
+  if (!title) return res.status(400).json({ error: 'Fic not found in library and no title provided to create it' });
+
+  const parseList = (str) => str ? str.split(/\s*;\s*/).map(s => s.trim()).filter(Boolean) : [];
+  const parseChaps = (str) => {
+    if (!str) return { total: null };
+    const parts = String(str).split('/');
+    return { total: parts[1] && parts[1] !== '?' ? parseInt(parts[1]) : null };
+  };
+
+  const { total: chapterTotal } = parseChaps(chapters);
+  const primaryFandom = (fandoms || fandom || '').split(/\s*[;,]\s*/)[0].trim() || '';
+
+  const id = uuidv4();
+  db.prepare(`
+    INSERT INTO fics (
+      id, user_id, title, author, fandom, ships, characters, word_count,
+      chapter_count, chapters_read, completion_status, content_rating,
+      content_warnings, tags, language, series_name, source_url, source_platform,
+      last_updated_date, shelf, personal_rating, cover_color,
+      description, last_visited, total_visits
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, userId, title, author || '', primaryFandom,
+    JSON.stringify(parseList(relationships)), JSON.stringify(parseList(characters)),
+    parseInt(String(words || '0').replace(/,/g, '')) || 0,
+    chapterTotal || chapter, chapter,
+    STATUS_MAP_QA[completion] || 'in-progress',
+    RATING_MAP_QA[rating] || 'T',
+    JSON.stringify(parseList(warnings).filter(w => w !== 'No Archive Warnings Apply' && w !== 'Creator Chose Not To Use Archive Warnings')),
+    JSON.stringify(parseList(freeforms)),
+    'English', '', sourceUrl, 'ao3',
+    '', 'reading', 0,
+    getFandomColor(primaryFandom),
+    summary || '', today, 1
+  );
+
+  res.json({
+    updated: false,
+    chapterNum: chapter,
+    ficTitle: title,
+    message: `Added to Reading — on chapter ${chapter}`,
+  });
+});
+
 module.exports = router;
